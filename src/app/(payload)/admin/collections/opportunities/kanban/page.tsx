@@ -1,10 +1,15 @@
 import React from 'react'
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { headers as getHeaders } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { KanbanView } from '@/components/kanban/KanbanView'
 import { KanbanPageHeader } from './KanbanHeader'
+
+export const metadata: Metadata = {
+  title: 'Opportunities - Kanban View | FireFist CRM',
+}
 
 /**
  * Kanban View Page for Opportunities

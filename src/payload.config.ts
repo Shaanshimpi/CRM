@@ -38,6 +38,7 @@ export default buildConfig({
     },
     // FireFist CRM branding components
     // Use string paths for Payload import map (relative to baseDir)
+    // Payload's import map system expects named exports
     components: {
       graphics: {
         Logo: './components/admin/FireFistLogo#FireFistLogo',

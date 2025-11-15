@@ -130,8 +130,10 @@ export const csvImportEndpoint: Endpoint = {
               leadDoc.customFields = normalizedData.customFields
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await payload.create({
               collection: 'leads',
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               data: leadDoc as any,
               req,
             })
@@ -236,6 +238,7 @@ export const excelImportEndpoint: Endpoint = {
           }
 
           try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const leadDoc: any = {
               firstName: normalizedData.firstName,
               lastName: normalizedData.lastName,
@@ -271,8 +274,10 @@ export const excelImportEndpoint: Endpoint = {
               leadDoc.customFields = normalizedData.customFields
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await payload.create({
               collection: 'leads',
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               data: leadDoc as any,
               req,
             })
@@ -355,6 +360,7 @@ export const apiImportEndpoint: Endpoint = {
         }
 
         try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const leadDoc: any = {
             firstName: normalizedData.firstName,
             lastName: normalizedData.lastName,

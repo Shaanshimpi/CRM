@@ -78,7 +78,9 @@ export const kanbanEndpoint: Endpoint = {
   handler: async (req: PayloadRequest) => {
     console.log('[Kanban Endpoint] ========== ENDPOINT CALLED ==========')
     console.log('[Kanban Endpoint] Handler started')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     console.log('[Kanban Endpoint] Request URL:', (req as any).url)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     console.log('[Kanban Endpoint] Request method:', (req as any).method || 'GET')
     
     const { payload, user, query } = req
@@ -92,6 +94,7 @@ export const kanbanEndpoint: Endpoint = {
 
     try {
       // STEP 1: Just log what we receive - don't do anything else yet
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const requestObj = req as any
       console.log('[Kanban Endpoint] === STEP 1: Logging request details ===')
       console.log('[Kanban Endpoint] query:', JSON.stringify(query, null, 2))

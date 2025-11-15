@@ -1,38 +1,70 @@
+'use client'
+
 import React from 'react'
 
-export const FireFistLogo: React.FC<{ className?: string }> = ({ className }) => {
+const FireFistLogo: React.FC<Record<string, any>> = (props: any) => {
+  const { className } = props || {}
   return (
     <div
+      data-firefist-logo="true"
+      className={`firefist-logo ${className || ''}`}
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '0.5rem',
+        gap: '0.625rem',
         fontWeight: 700,
         fontSize: '1.125rem',
         color: 'hsl(var(--theme-text))',
         textDecoration: 'none',
+        letterSpacing: '-0.01em',
+        lineHeight: 1.2,
       }}
-      className={className}
     >
       <span
         style={{
-          fontSize: '1.5rem',
+          fontSize: '1.75rem',
           lineHeight: 1,
+          filter: 'drop-shadow(0 0 2px rgba(255, 69, 0, 0.3))',
+          display: 'inline-block',
+          transform: 'translateY(2px)',
         }}
+        role="img"
+        aria-label="Fire"
       >
         🔥
       </span>
-      <span>FireFist</span>
-      <span
+      <div
         style={{
-          fontWeight: 500,
-          opacity: 0.7,
-          fontSize: '0.875rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.125rem',
+          lineHeight: 1,
         }}
       >
-        CRM
-      </span>
+        <span
+          style={{
+            fontSize: '1.125rem',
+            fontWeight: 700,
+            letterSpacing: '-0.02em',
+          }}
+        >
+          FireFist
+        </span>
+        <span
+          style={{
+            fontSize: '0.6875rem',
+            fontWeight: 500,
+            opacity: 0.65,
+            letterSpacing: '0.05em',
+            textTransform: 'uppercase',
+          }}
+        >
+          CRM
+        </span>
+      </div>
     </div>
   )
 }
 
+export default FireFistLogo
+export { FireFistLogo }

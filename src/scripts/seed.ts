@@ -433,6 +433,7 @@ async function seed() {
               contactEmail: generateEmail(firstName, lastName, company),
               contactPhone: generatePhone(),
               tags: getRandomItems(['enterprise', 'high-value', 'hot', 'qualified', 'mid-market'], Math.floor(Math.random() * 3) + 1),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } as any,
           })
           createdOpportunities++

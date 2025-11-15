@@ -96,9 +96,13 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   const [reminders, setReminders] = useState<Reminder[]>([])
 
   // UI state for adding new items
-  const [showAddTask, setShowAddTask] = useState(false)
-  const [showAddNote, setShowAddNote] = useState(false)
-  const [showAddReminder, setShowAddReminder] = useState(false)
+  // These state variables are used for future UI expansion
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_showAddTask, setShowAddTask] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_showAddNote, setShowAddNote] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_showAddReminder, setShowAddReminder] = useState(false)
 
   const fetchFullOpportunity = useCallback(async () => {
     setLoading(true)

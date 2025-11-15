@@ -39,7 +39,58 @@
 }
 
 // FireFist CRM Branding Styles
-// Minimal CSS - main branding handled via Payload graphics components
+// Enhanced branding for admin panel
+
+// Ensure custom logo and icon are always visible
+.firefist-logo,
+[data-firefist-logo] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+.firefist-icon,
+[data-firefist-icon] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+// Brand colors
+:root {
+  --firefist-primary: 16 100% 50%; // Orange-red (#FF4500)
+  --firefist-accent: 16 100% 60%; // Lighter orange-red
+}
+
+[data-theme='dark'] {
+  --firefist-primary: 16 100% 55%;
+  --firefist-accent: 16 100% 65%;
+}
+
+// Enhanced header/nav styling
+.payload-nav {
+  .payload-logo {
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    
+    &:hover {
+      opacity: 0.9;
+      transform: scale(1.02);
+    }
+  }
+}
+
+// Ensure consistent branding throughout
+.firefist-brand {
+  color: hsl(var(--firefist-primary));
+  
+  &:hover {
+    color: hsl(var(--firefist-accent));
+  }
+}
 
 // Additional custom styles for CRM components
 // These will be added as we build components
