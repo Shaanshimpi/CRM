@@ -387,8 +387,8 @@ export const updateStageEndpoint: Endpoint = {
       let body: { opportunityId?: string | number; newStageId?: string | number }
       if (typeof req.json === 'function') {
         body = await req.json()
-      } else if ((req as { request?: { json?: () => Promise<{ opportunityId?: string | number; newStageId?: string | number }> } }).request?.json) {
-        body = await (req as { request: { json: () => Promise<{ opportunityId?: string | number; newStageId?: string | number }> } }).request.json()
+      } else if ((req as unknown as { request?: { json?: () => Promise<{ opportunityId?: string | number; newStageId?: string | number }> } }).request?.json) {
+        body = await ((req as unknown as { request: { json: () => Promise<{ opportunityId?: string | number; newStageId?: string | number }> } }).request.json())
       } else {
         console.log('[UpdateStage Endpoint] ERROR: Cannot read request body')
         return Response.json({ error: 'Request body is required' }, { status: 400 })
