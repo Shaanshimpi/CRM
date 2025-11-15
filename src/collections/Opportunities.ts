@@ -10,7 +10,7 @@ export const Opportunities: CollectionConfig = {
     listSearchableFields: ['name', 'company', 'contactName', 'contactEmail'],
     components: {
       beforeList: [
-        OpportunitiesListHeader,
+        OpportunitiesListHeader as any,
       ],
     },
   },
@@ -49,11 +49,6 @@ export const Opportunities: CollectionConfig = {
       admin: {
         description: 'Pipeline this opportunity belongs to',
         position: 'sidebar',
-        filterOptions: {
-          isActive: {
-            equals: true,
-          },
-        },
       },
     },
     {
@@ -73,8 +68,9 @@ export const Opportunities: CollectionConfig = {
         description: 'Deal value',
         step: 0.01,
       },
-      validate: (value: number) => {
-        if (value !== undefined && value < 0) {
+      validate: (value: number | number[] | null | undefined): true | string => {
+        const numValue = Array.isArray(value) ? value[0] : value
+        if (numValue !== undefined && numValue !== null && numValue < 0) {
           return 'Value cannot be negative'
         }
         return true
@@ -115,8 +111,9 @@ export const Opportunities: CollectionConfig = {
         description: 'Win probability percentage (0-100)',
         step: 1,
       },
-      validate: (value: number) => {
-        if (value !== undefined && (value < 0 || value > 100)) {
+      validate: (value: number | number[] | null | undefined): true | string => {
+        const numValue = Array.isArray(value) ? value[0] : value
+        if (numValue !== undefined && numValue !== null && (numValue < 0 || numValue > 100)) {
           return 'Probability must be between 0 and 100'
         }
         return true
@@ -157,11 +154,6 @@ export const Opportunities: CollectionConfig = {
       admin: {
         description: 'User assigned to this opportunity',
         position: 'sidebar',
-        filterOptions: {
-          isActive: {
-            equals: true,
-          },
-        },
       },
     },
     {
