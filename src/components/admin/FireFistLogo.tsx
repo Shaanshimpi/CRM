@@ -1,5 +1,3 @@
-'use client'
-
 import React from 'react'
 
 export const FireFistLogo: React.FC<{ className?: string }> = ({ className }) => {

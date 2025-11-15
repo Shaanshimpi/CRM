@@ -36,10 +36,14 @@ export default buildConfig({
       titleSuffix: '- FireFist CRM',
       description: 'FireFist CRM Dashboard - Manage your leads, opportunities, and sales pipeline',
     },
-    // Remove Payload branding - set logo to undefined to remove default Payload logo
-    logo: undefined,
-    favicon: '/favicon.ico',
-    ogImage: '/og-image.png',
+    // FireFist CRM branding components
+    // Use string paths for Payload import map (relative to baseDir)
+    components: {
+      graphics: {
+        Logo: './components/admin/FireFistLogo#FireFistLogo',
+        Icon: './components/admin/FireFistIcon#FireFistIcon',
+      },
+    },
   },
   collections: [Users, Media, Pipelines, Stages, Leads, Opportunities],
   editor: lexicalEditor(),

@@ -18,11 +18,9 @@ export default async function HomePage() {
   return (
     <div className="home">
       <div className="content">
-        <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '1rem' }}>
-          🔥 FireFist CRM
+        <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '2rem' }}>
+          FireFist CRM
         </h1>
-        {!user && <h2 style={{ fontSize: '1.25rem', fontWeight: 400, marginBottom: '2rem' }}>Welcome to your CRM Dashboard</h2>}
-        {user && <h2 style={{ fontSize: '1.25rem', fontWeight: 400, marginBottom: '2rem' }}>Welcome back, {user.email}</h2>}
         <div className="links">
           <a
             className="admin"
@@ -33,12 +31,6 @@ export default async function HomePage() {
             Go to Dashboard
           </a>
         </div>
-      </div>
-      <div className="footer">
-        <p>Update this page by editing</p>
-        <a className="codeLink" href={fileURL}>
-          <code>app/(frontend)/page.tsx</code>
-        </a>
       </div>
     </div>
   )
