@@ -38,6 +38,162 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+// FireFist CRM Branding Styles
+// Comprehensive branding for Payload admin panel
+
+// Hide all Payload branding/logos
+svg[width="144"],
+svg[width="120"],
+img[alt*="Payload"],
+img[alt*="payload"],
+img[src*="payload"],
+a[href="/admin"] svg,
+a[href="/admin"] img,
+.template-default__brand svg,
+.template-default__brand img,
+.nav__brand svg,
+.nav__brand img,
+.login__brand svg,
+.login__brand img {
+  display: none !important;
+}
+
+// Admin panel navigation header - FireFist branding
+.template-default__nav,
+.nav,
+[data-nav],
+header nav {
+  // Brand/logo area
+  .template-default__brand,
+  .nav__brand,
+  a[href="/admin"],
+  a[href="/admin"] {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: hsl(var(--theme-text)) !important;
+    text-decoration: none;
+    
+    // Replace with FireFist branding
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    
+    &::before {
+      content: '🔥 FireFist';
+      display: inline-flex;
+      align-items: center;
+      font-weight: 700;
+      font-size: 1.125rem;
+    }
+
+    &::after {
+      content: ' CRM';
+      font-weight: 500;
+      opacity: 0.7;
+      font-size: 0.875rem;
+      margin-left: 0.25rem;
+    }
+
+    // Hide default logo/image/text
+    svg,
+    img,
+    > span:not(.firefist-brand),
+    > div:not(.firefist-brand) {
+      display: none !important;
+    }
+  }
+}
+
+// Login page - FireFist branding
+.template-default__wrap,
+.auth__wrap,
+.login__wrap,
+[data-login],
+form[action*="login"],
+form[action*="auth"] {
+  // Add large FireFist logo at top
+  position: relative;
+  
+  &::before {
+    content: '🔥';
+    display: block;
+    font-size: 4rem;
+    text-align: center;
+    margin: 0 auto 1rem;
+    line-height: 1;
+    width: 100%;
+  }
+
+  // Style the title/heading
+  h1,
+  .template-default__brand,
+  .login__brand,
+  h1[class*="brand"],
+  h1[class*="title"] {
+    font-size: 2rem !important;
+    font-weight: 700 !important;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    color: hsl(var(--theme-text)) !important;
+    
+    &::before {
+      content: 'FireFist';
+      display: block;
+    }
+
+    &::after {
+      content: ' CRM';
+      font-weight: 500;
+      opacity: 0.7;
+      font-size: 1.25rem;
+      margin-left: 0.25rem;
+    }
+
+    // Hide any default text
+    &:not(:empty)::before {
+      display: none;
+    }
+  }
+
+  // Hide Payload logos on login
+  svg,
+  img[alt*="Payload"],
+  img[alt*="payload"],
+  img[src*="payload"] {
+    display: none !important;
+  }
+}
+
+// Admin panel sidebar/topbar branding
+nav,
+.nav,
+[role="navigation"] {
+  a[href="/admin"],
+  .template-default__brand {
+    &::before {
+      content: '🔥 FireFist';
+      font-weight: 700;
+    }
+
+    &::after {
+      content: ' CRM';
+      font-weight: 500;
+      opacity: 0.7;
+      font-size: 0.875rem;
+    }
+  }
+}
+
+// Ensure branding shows in page title area (if Payload uses title in nav)
+h1,
+h2,
+.template-default__title {
+  &::before {
+    // Add FireFist prefix to page titles if needed
+  }
+}
+
 // Additional custom styles for CRM components
 // These will be added as we build components
 
