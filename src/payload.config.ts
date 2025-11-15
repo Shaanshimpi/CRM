@@ -33,7 +33,18 @@ export default buildConfig({
     },
     // Branding configuration
     meta: {
-      titleSuffix: '- CRM',
+      titleSuffix: '- FireFist CRM',
+      description: 'FireFist CRM Dashboard - Manage your leads, opportunities, and sales pipeline',
+    },
+    // Remove Payload branding
+    logo: undefined,
+    favicon: '/favicon.ico',
+    ogImage: '/og-image.png',
+    components: {
+      beforeLogin: [],
+      afterLogin: [],
+      beforeNav: [],
+      afterNav: [],
     },
   },
   collections: [Users, Media, Pipelines, Stages, Leads, Opportunities],

@@ -18,17 +18,11 @@ export default async function HomePage() {
   return (
     <div className="home">
       <div className="content">
-        <picture>
-          <source srcSet="https://raw.githubusercontent.com/payloadcms/payload/main/packages/ui/src/assets/payload-favicon.svg" />
-          <Image
-            alt="Payload Logo"
-            height={65}
-            src="https://raw.githubusercontent.com/payloadcms/payload/main/packages/ui/src/assets/payload-favicon.svg"
-            width={65}
-          />
-        </picture>
-        {!user && <h1>Welcome to your new project.</h1>}
-        {user && <h1>Welcome back, {user.email}</h1>}
+        <h1 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '1rem' }}>
+          🔥 FireFist CRM
+        </h1>
+        {!user && <h2 style={{ fontSize: '1.25rem', fontWeight: 400, marginBottom: '2rem' }}>Welcome to your CRM Dashboard</h2>}
+        {user && <h2 style={{ fontSize: '1.25rem', fontWeight: 400, marginBottom: '2rem' }}>Welcome back, {user.email}</h2>}
         <div className="links">
           <a
             className="admin"
@@ -36,15 +30,7 @@ export default async function HomePage() {
             rel="noopener noreferrer"
             target="_blank"
           >
-            Go to admin panel
-          </a>
-          <a
-            className="docs"
-            href="https://payloadcms.com/docs"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            Documentation
+            Go to Dashboard
           </a>
         </div>
       </div>
