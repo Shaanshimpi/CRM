@@ -7,6 +7,7 @@ interface OpportunityModalProps {
   opportunity: KanbanOpportunity | null
   columns: KanbanColumn[]
   currentStageId: string
+  pipelineId?: string | null
   onClose: () => void
   onStageChange: (opportunityId: string, newStageId: string) => Promise<void>
   onSave?: () => void
@@ -50,11 +51,13 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   opportunity,
   columns,
   currentStageId,
+  pipelineId,
   onClose,
   onStageChange,
   onSave,
   apiUrl = '/api',
 }) => {
+  const isCreateMode = !opportunity
   const [fullOpportunity, setFullOpportunity] = useState<{
     id?: string | number
     name?: string
@@ -76,6 +79,8 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [users, setUsers] = useState<User[]>([])
+  const [createLead, setCreateLead] = useState(false)
+  const [leadId, setLeadId] = useState<string | number | null>(null)
 
   // Form state
   const [name, setName] = useState('')
@@ -133,8 +138,9 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   useEffect(() => {
     if (opportunity?.id) {
       fetchFullOpportunity()
-      fetchUsers()
     }
+    // Always fetch users for assignee selection
+    fetchUsers()
   }, [opportunity?.id, fetchFullOpportunity, fetchUsers])
 
   useEffect(() => {
@@ -156,39 +162,91 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
     }
   }, [fullOpportunity, currentStageId])
 
+  const handleCreateLead = async () => {
+    if (!contactEmail || !contactName) {
+      alert('Contact email and name are required to create a lead')
+      return
+    }
+
+    try {
+      const [firstName, ...lastNameParts] = contactName.trim().split(' ')
+      const lastName = lastNameParts.join(' ') || ''
+      
+      const leadData = {
+        firstName: firstName || contactName,
+        lastName: lastName,
+        email: contactEmail,
+        phone: contactPhone || undefined,
+        company: company || undefined,
+        source: 'website',
+        status: 'new',
+      }
+
+      const response = await fetch(`${apiUrl}/leads`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(leadData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Failed to create lead')
+      }
+
+      const created = await response.json()
+      setLeadId(created.doc.id)
+      setCreateLead(false)
+      alert('Lead created successfully!')
+    } catch (error) {
+      console.error('Failed to create lead:', error)
+      alert(`Failed to create lead: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
   const handleSave = async () => {
+    if (!name.trim()) {
+      alert('Opportunity name is required')
+      return
+    }
+
+    if (!selectedStageId) {
+      alert('Please select a stage')
+      return
+    }
+
+    if (!assignedTo) {
+      alert('Please assign the opportunity to a user')
+      return
+    }
+
+    if (!pipelineId) {
+      alert('Pipeline is required')
+      return
+    }
+
     setSaving(true)
     try {
-      // Determine ID types from the full opportunity data
-      const stageIdType = fullOpportunity?.currentStage 
-        ? (typeof fullOpportunity.currentStage === 'object' ? typeof fullOpportunity.currentStage.id : typeof fullOpportunity.currentStage)
-        : 'number'
-      const assignedToType = fullOpportunity?.assignedTo 
-        ? (typeof fullOpportunity.assignedTo === 'object' ? typeof fullOpportunity.assignedTo.id : typeof fullOpportunity.assignedTo)
-        : 'number'
-      const pipelineIdType = fullOpportunity?.pipeline 
-        ? (typeof fullOpportunity.pipeline === 'object' ? typeof fullOpportunity.pipeline.id : typeof fullOpportunity.pipeline)
-        : 'number'
+      // Determine ID types
+      const stageIdType = 'number'
+      const assignedToType = 'number'
+      const pipelineIdType = 'number'
 
       // Convert IDs to correct types
-      const convertedStageId = stageIdType === 'number' && /^\d+$/.test(String(selectedStageId))
+      const convertedStageId = /^\d+$/.test(String(selectedStageId))
         ? Number(selectedStageId)
         : selectedStageId
       
-      const convertedAssignedTo = assignedTo 
-        ? (assignedToType === 'number' && /^\d+$/.test(String(assignedTo)) ? Number(assignedTo) : assignedTo)
-        : undefined
+      const convertedAssignedTo = assignedTo && /^\d+$/.test(String(assignedTo))
+        ? Number(assignedTo)
+        : assignedTo
 
-      // Get pipeline ID for validation
-      const pipelineId = fullOpportunity?.pipeline 
-        ? (typeof fullOpportunity.pipeline === 'object' ? fullOpportunity.pipeline.id : fullOpportunity.pipeline)
-        : undefined
+      const convertedPipelineId = pipelineId && /^\d+$/.test(String(pipelineId))
+        ? Number(pipelineId)
+        : pipelineId
 
-      const convertedPipelineId = pipelineId 
-        ? (pipelineIdType === 'number' && /^\d+$/.test(String(pipelineId)) ? Number(pipelineId) : pipelineId)
-        : undefined
-
-      const updateData: Record<string, unknown> = {
+      const opportunityData: Record<string, unknown> = {
         name,
         company: company || undefined,
         contactName: contactName || undefined,
@@ -200,8 +258,8 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
         expectedCloseDate: expectedCloseDate || undefined,
         assignedTo: convertedAssignedTo,
         currentStage: convertedStageId,
-        // Include pipeline for validation hook
-        ...(convertedPipelineId && { pipeline: convertedPipelineId }),
+        pipeline: convertedPipelineId,
+        ...(leadId && { lead: leadId }),
         tasks: tasks.map(task => {
           // Convert task assignedTo ID type
           const taskAssignedTo = task.assignedTo 
@@ -234,25 +292,51 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
         })),
       }
 
-      const response = await fetch(`${apiUrl}/opportunities/${opportunity?.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      })
+      if (isCreateMode) {
+        // Create new opportunity
+        const response = await fetch(`${apiUrl}/opportunities`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          body: JSON.stringify(opportunityData as any),
+        })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.errors 
-          ? errorData.errors.map((err: { message?: string; path?: string }) => err.message || err.path || 'Validation error').join(', ')
-          : errorData.message || `Failed to update opportunity (${response.status})`
-        throw new Error(errorMessage)
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.errors 
+            ? errorData.errors.map((err: { message?: string; path?: string }) => err.message || err.path || 'Validation error').join(', ')
+            : errorData.message || `Failed to create opportunity (${response.status})`
+          throw new Error(errorMessage)
+        }
+
+        const created = await response.json()
+        alert('Opportunity created successfully!')
+        onSave?.()
+        onClose()
+      } else {
+        // Update existing opportunity
+        const response = await fetch(`${apiUrl}/opportunities/${opportunity!.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(opportunityData),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.errors 
+            ? errorData.errors.map((err: { message?: string; path?: string }) => err.message || err.path || 'Validation error').join(', ')
+            : errorData.message || `Failed to update opportunity (${response.status})`
+          throw new Error(errorMessage)
+        }
+
+        await onStageChange(opportunity!.id, selectedStageId)
+        onSave?.()
+        onClose()
       }
-
-      await onStageChange(opportunity!.id, selectedStageId)
-      onSave?.()
-      onClose()
     } catch (error) {
       console.error('Failed to save opportunity:', error)
       alert(error instanceof Error ? error.message : 'Failed to save opportunity')
@@ -331,7 +415,12 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
     return date.toISOString().split('T')[0]
   }
 
-  if (!opportunity || loading) {
+  // Show loading only when fetching an existing opportunity
+  // In create mode (isCreateMode = true), we should never show loading
+  if (isCreateMode) {
+    // In create mode, render the form immediately
+  } else if (!opportunity || loading) {
+    // In edit mode, show loading while fetching opportunity data
     return (
       <div
         className="kanban-modal-overlay"
@@ -540,6 +629,37 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
                 />
               </div>
             </div>
+            {!leadId && contactEmail && contactName && (
+              <div style={{ marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={handleCreateLead}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    backgroundColor: 'hsl(var(--theme-elevation-1))',
+                    border: '1px solid hsl(var(--theme-border-color))',
+                    borderRadius: 'var(--radius)',
+                    color: 'hsl(var(--theme-text))',
+                    fontSize: '0.875rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Create Lead from Contact
+                </button>
+              </div>
+            )}
+            {leadId && (
+              <div style={{ marginTop: '1rem', padding: '0.5rem', backgroundColor: 'hsl(var(--theme-elevation-1))', borderRadius: 'var(--radius)', fontSize: '0.875rem', color: 'hsl(var(--theme-text) / 0.7)' }}>
+                ✓ Lead created (ID: {leadId})
+              </div>
+            )}
           </div>
 
           {/* Deal Information */}
@@ -1137,7 +1257,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
               cursor: saving || !name.trim() ? 'not-allowed' : 'pointer',
             }}
           >
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? (isCreateMode ? 'Creating...' : 'Saving...') : (isCreateMode ? 'Create Opportunity' : 'Save Changes')}
           </button>
         </div>
       </div>

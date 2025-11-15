@@ -16,6 +16,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null)
   const [selectedOpportunity, setSelectedOpportunity] = useState<KanbanOpportunity | null>(null)
   const [showStageManagement, setShowStageManagement] = useState(false)
+  const [showNewOpportunity, setShowNewOpportunity] = useState(false)
 
   const { data, loading, error, refetch } = useKanbanData(selectedPipelineId, apiUrl)
 
@@ -171,6 +172,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
         onPipelineChange={setSelectedPipelineId}
         onStagesManage={() => setShowStageManagement(true)}
         onPipelineCreated={handleStagesUpdated}
+        onNewOpportunity={() => setShowNewOpportunity(true)}
         apiUrl={apiUrl}
       />
       
@@ -187,15 +189,36 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
         </div>
       </div>
 
-      {/* Opportunity Modal */}
-      {selectedOpportunity && data && (
+      {/* Opportunity Modal - View/Edit */}
+      {selectedOpportunity && data && !showNewOpportunity && (
         <OpportunityModal
           opportunity={selectedOpportunity}
           columns={data.columns}
           currentStageId={selectedOpportunity.stage.id}
+          pipelineId={selectedPipelineId}
           onClose={handleCloseModal}
           onStageChange={handleStageChange}
-          onSave={() => refetch()}
+          onSave={() => {
+            refetch()
+            handleCloseModal()
+          }}
+          apiUrl={apiUrl}
+        />
+      )}
+
+      {/* Opportunity Modal - Create New */}
+      {showNewOpportunity && data && selectedPipelineId && (
+        <OpportunityModal
+          opportunity={null}
+          columns={data.columns}
+          currentStageId={data.columns[0]?.stage?.id || ''}
+          pipelineId={selectedPipelineId}
+          onClose={() => setShowNewOpportunity(false)}
+          onStageChange={async () => {}}
+          onSave={() => {
+            refetch()
+            setShowNewOpportunity(false)
+          }}
           apiUrl={apiUrl}
         />
       )}

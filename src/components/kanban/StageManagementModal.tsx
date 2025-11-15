@@ -32,7 +32,9 @@ export const StageManagementModal: React.FC<StageManagementModalProps> = ({
   const [loading, setLoading] = useState(false)
   const [editingStage, setEditingStage] = useState<Stage | undefined>(undefined)
   const [showCreateStage, setShowCreateStage] = useState(false)
-  const [reordering, setReordering] = useState<string | null>(null)
+  const [pendingOrderChanges, setPendingOrderChanges] = useState<Record<string, number>>({})
+  const [hasPendingChanges, setHasPendingChanges] = useState(false)
+  const [savingOrder, setSavingOrder] = useState(false)
 
   const fetchStages = useCallback(async () => {
     setLoading(true)
@@ -54,6 +56,9 @@ export const StageManagementModal: React.FC<StageManagementModalProps> = ({
   useEffect(() => {
     if (isOpen && pipelineId) {
       fetchStages()
+      // Reset pending changes when modal opens
+      setPendingOrderChanges({})
+      setHasPendingChanges(false)
     }
   }, [isOpen, pipelineId, fetchStages])
 
@@ -120,48 +125,83 @@ export const StageManagementModal: React.FC<StageManagementModalProps> = ({
     }
   }
 
-  const handleMoveStage = async (stageId: string, direction: 'up' | 'down') => {
-    const currentIndex = stages.findIndex((s) => s.id === stageId)
+  const handleMoveStage = (stageId: string, direction: 'up' | 'down') => {
+    // Get current visual order (from stages state with pending changes applied)
+    const currentStages = stages.map((stage) => ({
+      ...stage,
+      order: pendingOrderChanges[stage.id] !== undefined ? pendingOrderChanges[stage.id] : stage.order,
+    })).sort((a, b) => a.order - b.order)
+
+    const currentIndex = currentStages.findIndex((s) => s.id === stageId)
     if (currentIndex === -1) return
 
     const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
-    if (newIndex < 0 || newIndex >= stages.length) return
+    if (newIndex < 0 || newIndex >= currentStages.length) return
 
-    setReordering(stageId)
-
-    // Create new order
-    const newStages = [...stages]
+    // Create new order locally (visual only)
+    const newStages = [...currentStages]
     const [moved] = newStages.splice(currentIndex, 1)
     newStages.splice(newIndex, 0, moved)
 
-    // Update orders
-    const updatedOrders = newStages.map((stage, index) => ({
-      id: stage.id,
-      order: index,
-    }))
+    // Update pending order changes
+    const newPendingChanges: Record<string, number> = { ...pendingOrderChanges }
+    newStages.forEach((stage, index) => {
+      newPendingChanges[stage.id] = index
+    })
 
+    setPendingOrderChanges(newPendingChanges)
+    setHasPendingChanges(true)
+  }
+
+  const handleSaveOrder = async () => {
+    if (!hasPendingChanges) return
+
+    setSavingOrder(true)
     try {
       // Update all stages with new orders
       await Promise.all(
-        updatedOrders.map(({ id, order }) =>
+        Object.entries(pendingOrderChanges).map(([id, order]) =>
           fetch(`${apiUrl}/stages/${id}`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ order }),
+          }).then((res) => {
+            if (!res.ok) {
+              throw new Error(`Failed to update stage ${id}`)
+            }
+            return res.json()
           })
         )
       )
 
+      // Reset pending changes
+      setPendingOrderChanges({})
+      setHasPendingChanges(false)
+      
+      // Refresh stages from server
       await fetchStages()
       onStagesUpdated?.()
     } catch (error) {
-      console.error('Failed to reorder stages:', error)
-      alert('Failed to reorder stages. Please try again.')
+      console.error('Failed to save stage order:', error)
+      alert('Failed to save stage order. Please try again.')
     } finally {
-      setReordering(null)
+      setSavingOrder(false)
     }
+  }
+
+  const handleCancelOrderChanges = () => {
+    setPendingOrderChanges({})
+    setHasPendingChanges(false)
+  }
+
+  // Get stages with pending order changes applied for display
+  const getDisplayStages = (): Stage[] => {
+    return stages.map((stage) => ({
+      ...stage,
+      order: pendingOrderChanges[stage.id] !== undefined ? pendingOrderChanges[stage.id] : stage.order,
+    })).sort((a, b) => a.order - b.order)
   }
 
   if (!isOpen) return null
@@ -183,7 +223,30 @@ export const StageManagementModal: React.FC<StageManagementModalProps> = ({
           </div>
 
           <div className="kanban-modal-content">
-            <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {hasPendingChanges && (
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.875rem', color: 'hsl(var(--theme-warning-500))' }}>
+                    You have unsaved order changes
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSaveOrder}
+                    disabled={savingOrder}
+                    className="kanban-button kanban-button-primary kanban-button-small"
+                  >
+                    {savingOrder ? 'Saving...' : 'Save Order'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelOrderChanges}
+                    disabled={savingOrder}
+                    className="kanban-button kanban-button-small"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -210,7 +273,7 @@ export const StageManagementModal: React.FC<StageManagementModalProps> = ({
               </div>
             ) : (
               <div className="kanban-stage-list">
-                {stages.map((stage, index) => (
+                {getDisplayStages().map((stage, index) => (
                   <div
                     key={stage.id}
                     className="kanban-stage-item"
@@ -220,7 +283,7 @@ export const StageManagementModal: React.FC<StageManagementModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleMoveStage(stage.id, 'up')}
-                          disabled={index === 0 || reordering === stage.id}
+                          disabled={index === 0 || savingOrder}
                           className="kanban-reorder-button"
                           title="Move up"
                         >
@@ -231,7 +294,7 @@ export const StageManagementModal: React.FC<StageManagementModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleMoveStage(stage.id, 'down')}
-                          disabled={index === stages.length - 1 || reordering === stage.id}
+                          disabled={index === getDisplayStages().length - 1 || savingOrder}
                           className="kanban-reorder-button"
                           title="Move down"
                         >
@@ -275,7 +338,7 @@ export const StageManagementModal: React.FC<StageManagementModalProps> = ({
                         }}
                         className="kanban-button kanban-button-small"
                         title="Edit stage"
-                        disabled={reordering === stage.id}
+                        disabled={savingOrder || hasPendingChanges}
                       >
                         Edit
                       </button>
@@ -284,7 +347,7 @@ export const StageManagementModal: React.FC<StageManagementModalProps> = ({
                         onClick={() => handleDeleteStage(stage.id)}
                         className="kanban-button kanban-button-small kanban-button-danger"
                         title="Delete stage"
-                        disabled={reordering === stage.id}
+                        disabled={savingOrder || hasPendingChanges}
                       >
                         Delete
                       </button>

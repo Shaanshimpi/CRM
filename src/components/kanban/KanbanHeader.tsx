@@ -14,6 +14,7 @@ interface KanbanHeaderProps {
   onPipelineChange: (pipelineId: string) => void
   onPipelineCreated?: () => void
   onStagesManage?: () => void
+  onNewOpportunity?: () => void
   apiUrl?: string
 }
 
@@ -22,6 +23,7 @@ export const KanbanHeader: React.FC<KanbanHeaderProps> = ({
   onPipelineChange,
   onPipelineCreated,
   onStagesManage,
+  onNewOpportunity,
   apiUrl = '/api',
 }) => {
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
@@ -101,6 +103,20 @@ export const KanbanHeader: React.FC<KanbanHeaderProps> = ({
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {selectedPipelineId && onNewOpportunity && (
+            <button
+              type="button"
+              onClick={onNewOpportunity}
+              className="kanban-button kanban-button-primary"
+              title="Create New Opportunity"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              New Opportunity
+            </button>
+          )}
           {selectedPipelineId && onStagesManage && (
             <button
               type="button"
@@ -118,7 +134,7 @@ export const KanbanHeader: React.FC<KanbanHeaderProps> = ({
           <button
             type="button"
             onClick={() => setShowCreatePipeline(true)}
-            className="kanban-button kanban-button-primary"
+            className="kanban-button kanban-button-secondary"
             title="Create Pipeline"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
