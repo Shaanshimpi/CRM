@@ -84,7 +84,7 @@ function mapRowToLeadData(
         leadData.tags = value.split(/[;,]/).map((tag) => tag.trim()).filter(Boolean)
       } else {
         // Direct mapping
-        ;(leadData as any)[leadField] = value
+        ;(leadData as Record<string, unknown>)[leadField] = value
       }
     }
   }

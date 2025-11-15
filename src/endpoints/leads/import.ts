@@ -1,7 +1,7 @@
 import type { PayloadRequest } from 'payload'
 import type { Endpoint } from 'payload'
 import { parseCSV } from '../../utilities/import/csvParser'
-import { parseExcel, getExcelSheetNames } from '../../utilities/import/excelParser'
+import { parseExcel } from '../../utilities/import/excelParser'
 import { validateLead, normalizeLeadData, type LeadImportData } from '../../utilities/import/leadValidator'
 
 export interface ImportResult {
@@ -33,6 +33,9 @@ export const csvImportEndpoint: Endpoint = {
 
     try {
       // Get file from form data
+      if (!req.formData) {
+        return Response.json({ error: 'FormData not supported' }, { status: 400 })
+      }
       const formData = await req.formData()
       const file = formData.get('file') as File | null
 
@@ -89,7 +92,7 @@ export const csvImportEndpoint: Endpoint = {
           // Create lead
           try {
             // Build lead document
-            const leadDoc: any = {
+            const leadDoc: Record<string, unknown> = {
               firstName: normalizedData.firstName,
               lastName: normalizedData.lastName,
               email: normalizedData.email,
@@ -129,7 +132,7 @@ export const csvImportEndpoint: Endpoint = {
 
             await payload.create({
               collection: 'leads',
-              data: leadDoc,
+              data: leadDoc as any,
               req,
             })
 
@@ -178,6 +181,9 @@ export const excelImportEndpoint: Endpoint = {
 
     try {
       // Get file from form data
+      if (!req.formData) {
+        return Response.json({ error: 'FormData not supported' }, { status: 400 })
+      }
       const formData = await req.formData()
       const file = formData.get('file') as File | null
       const sheetName = formData.get('sheetName') as string | null
@@ -267,7 +273,7 @@ export const excelImportEndpoint: Endpoint = {
 
             await payload.create({
               collection: 'leads',
-              data: leadDoc,
+              data: leadDoc as any,
               req,
             })
 
@@ -315,6 +321,9 @@ export const apiImportEndpoint: Endpoint = {
     }
 
     try {
+      if (!req.json) {
+        return Response.json({ error: 'JSON parsing not supported' }, { status: 400 })
+      }
       const body = await req.json()
       const leadsData: LeadImportData[] = Array.isArray(body) ? body : [body]
 

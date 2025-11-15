@@ -15,7 +15,7 @@ export interface LeadImportData {
   zip?: string
   country?: string
   tags?: string[]
-  customFields?: Record<string, any>
+  customFields?: Record<string, unknown>
 }
 
 export interface ValidationResult {

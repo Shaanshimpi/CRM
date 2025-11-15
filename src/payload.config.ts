@@ -34,11 +34,7 @@ export default buildConfig({
     // Branding configuration
     meta: {
       titleSuffix: '- CRM',
-      favicon: '/favicon.ico',
-      ogImage: '/og-image.png',
     },
-    // Admin route
-    baseURL: process.env.PAYLOAD_PUBLIC_SERVER_URL || 'http://localhost:3000',
   },
   collections: [Users, Media, Pipelines, Stages, Leads, Opportunities],
   editor: lexicalEditor(),

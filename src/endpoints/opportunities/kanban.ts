@@ -273,15 +273,15 @@ export const kanbanEndpoint: Endpoint = {
             const tasksArray = Array.isArray(opp.tasks) ? opp.tasks : []
             const tasks = tasksArray.length > 0 ? {
               count: tasksArray.length,
-              pendingCount: tasksArray.filter((t: any) => t.status !== 'completed' && t.status !== 'cancelled').length,
-              completedCount: tasksArray.filter((t: any) => t.status === 'completed').length,
+              pendingCount: tasksArray.filter((t) => t.status && t.status !== 'completed' && t.status !== 'cancelled').length,
+              completedCount: tasksArray.filter((t) => t.status === 'completed').length,
             } : undefined
 
             // Process reminders
             const remindersArray = Array.isArray(opp.reminders) ? opp.reminders : []
             const reminders = remindersArray.length > 0 ? {
               count: remindersArray.length,
-              pendingCount: remindersArray.filter((r: any) => r.status === 'pending').length,
+              pendingCount: remindersArray.filter((r) => r.status === 'pending').length,
             } : undefined
 
             return {
@@ -384,11 +384,11 @@ export const updateStageEndpoint: Endpoint = {
     console.log('[UpdateStage Endpoint] User authenticated:', user.email)
 
     try {
-      let body: any
+      let body: { opportunityId?: string | number; newStageId?: string | number }
       if (typeof req.json === 'function') {
         body = await req.json()
-      } else if ((req as any).request && typeof (req as any).request.json === 'function') {
-        body = await (req as any).request.json()
+      } else if ((req as { request?: { json?: () => Promise<{ opportunityId?: string | number; newStageId?: string | number }> } }).request?.json) {
+        body = await (req as { request: { json: () => Promise<{ opportunityId?: string | number; newStageId?: string | number }> } }).request.json()
       } else {
         console.log('[UpdateStage Endpoint] ERROR: Cannot read request body')
         return Response.json({ error: 'Request body is required' }, { status: 400 })
@@ -400,7 +400,7 @@ export const updateStageEndpoint: Endpoint = {
       }
       console.log('[UpdateStage Endpoint] Request body:', body)
       
-      const { opportunityId, stageId } = body
+      const { opportunityId, newStageId: stageId } = body
       console.log('[UpdateStage Endpoint] Opportunity ID:', opportunityId)
       console.log('[UpdateStage Endpoint] Stage ID:', stageId)
 
@@ -539,7 +539,7 @@ export const updateStageEndpoint: Endpoint = {
       
       console.log('[UpdateStage Endpoint] ID types - Opportunity:', opportunityIdType, 'Stage:', stageIdType, 'Pipeline:', pipelineIdType)
       
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         // Use the actual stage ID with proper type
         currentStage: stageIdType === 'number' ? Number(actualStageId) : actualStageId,
       }

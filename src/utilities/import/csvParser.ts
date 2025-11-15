@@ -85,7 +85,7 @@ function mapRowToLeadData(
         leadData.tags = value.split(/[;,]/).map((tag) => tag.trim()).filter(Boolean)
       } else {
         // Direct mapping
-        ;(leadData as any)[leadField] = value
+        ;(leadData as Record<string, unknown>)[leadField] = value
       }
     }
   }
@@ -130,9 +130,15 @@ export function parseCSV(
     }
 
     // Map rows using column mapping
-    return (records as Record<string, string>[]).map((row, index) => ({
+    // When hasHeaders is true, parse returns Record<string, string>[]
+    // We need to cast it properly
+    const typedRecords = hasHeaders 
+      ? (records as unknown as Record<string, string>[])
+      : []
+    
+    return typedRecords.map((row, index) => ({
       data: mapRowToLeadData(row, columnMapping),
-      rowNumber: index + (hasHeaders ? 2 : 1), // +2 if headers (row 1 is header, row 2 is first data)
+      rowNumber: index + 2, // +2 if headers (row 1 is header, row 2 is first data)
     }))
   } catch (error) {
     throw new Error(`Failed to parse CSV: ${error instanceof Error ? error.message : 'Unknown error'}`)

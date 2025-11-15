@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { KanbanView } from '@/components/kanban/KanbanView'
 
 /**
@@ -68,7 +69,7 @@ const KanbanPage = () => {
             Opportunities - Kanban View
           </h1>
         </div>
-        <a
+        <Link
           href="/admin/collections/opportunities/kanban"
           style={{
             display: 'inline-flex',
@@ -108,7 +109,7 @@ const KanbanPage = () => {
             <line x1="3" y1="15" x2="21" y2="15" />
           </svg>
           Kanban View
-        </a>
+        </Link>
       </div>
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
         <KanbanView />

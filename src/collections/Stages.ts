@@ -7,7 +7,6 @@ export const Stages: CollectionConfig = {
     defaultColumns: ['name', 'pipeline', 'order', 'isDefault', 'isClosedStage'],
     description: 'Manage stages within pipelines',
     listSearchableFields: ['name', 'description'],
-    defaultSort: 'order',
   },
   access: {
     read: () => true,
@@ -196,7 +195,7 @@ export const Stages: CollectionConfig = {
       },
     ],
     beforeDelete: [
-      async ({ id, req }) => {
+      async ({ id: _id, req: _req }) => {
         // Prevent deletion if opportunities are using this stage
         // Note: This will be checked in Phase 4 when Opportunities collection is created
         // For now, we'll just check if stage exists

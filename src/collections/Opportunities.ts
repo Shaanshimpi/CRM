@@ -561,7 +561,7 @@ export const Opportunities: CollectionConfig = {
               : data.pipeline
 
           if (pipelineId) {
-            const pipeline = await req.payload.findByID({
+            const _pipeline = await req.payload.findByID({
               collection: 'pipelines',
               id: pipelineId,
             })

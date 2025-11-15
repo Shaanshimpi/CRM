@@ -21,7 +21,7 @@ export const PipelineModal: React.FC<PipelineModalProps> = ({
   onClose,
   onSave,
   pipeline,
-  apiUrl = '/api',
+  apiUrl: _apiUrl = '/api',
 }) => {
   const [formData, setFormData] = useState<Omit<Pipeline, 'id'>>({
     name: pipeline?.name || '',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { PipelineModal } from './PipelineModal'
 
 interface Pipeline {
@@ -28,7 +28,7 @@ export const KanbanHeader: React.FC<KanbanHeaderProps> = ({
   const [loading, setLoading] = useState(false)
   const [showCreatePipeline, setShowCreatePipeline] = useState(false)
 
-  const fetchPipelines = async () => {
+  const fetchPipelines = useCallback(async () => {
     setLoading(true)
     try {
       const response = await fetch(`${apiUrl}/pipelines?where[isActive][equals]=true&limit=100`)
@@ -46,11 +46,11 @@ export const KanbanHeader: React.FC<KanbanHeaderProps> = ({
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiUrl, selectedPipelineId, onPipelineChange])
 
   useEffect(() => {
     fetchPipelines()
-  }, [apiUrl, selectedPipelineId, onPipelineChange])
+  }, [fetchPipelines])
 
   const handleCreatePipeline = async (pipelineData: Omit<Pipeline, 'id'>) => {
     try {

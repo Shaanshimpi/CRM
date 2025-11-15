@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { StageModal } from './StageModal'
 
 interface Stage {
@@ -34,7 +34,7 @@ export const StageManagementModal: React.FC<StageManagementModalProps> = ({
   const [showCreateStage, setShowCreateStage] = useState(false)
   const [reordering, setReordering] = useState<string | null>(null)
 
-  const fetchStages = async () => {
+  const fetchStages = useCallback(async () => {
     setLoading(true)
     try {
       const response = await fetch(
@@ -49,13 +49,13 @@ export const StageManagementModal: React.FC<StageManagementModalProps> = ({
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiUrl, pipelineId])
 
   useEffect(() => {
     if (isOpen && pipelineId) {
       fetchStages()
     }
-  }, [isOpen, pipelineId, apiUrl])
+  }, [isOpen, pipelineId, fetchStages])
 
   const handleSaveStage = async (stageData: Omit<Stage, 'id'>) => {
     try {

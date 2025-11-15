@@ -70,7 +70,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     }
   }, [])
 
-  const handleMouseEnter = (e: React.MouseEvent) => {
+  const handleMouseEnter = (_e: React.MouseEvent) => {
     if (tooltipTimeoutRef.current) {
       clearTimeout(tooltipTimeoutRef.current)
     }

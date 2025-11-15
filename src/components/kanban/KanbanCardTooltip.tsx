@@ -82,7 +82,7 @@ export const KanbanCardTooltip: React.FC<KanbanCardTooltipProps> = ({
         } else {
           setError('Failed to load details')
         }
-      } catch (err) {
+      } catch (_err) {
         setError('Failed to load details')
       } finally {
         setLoading(false)

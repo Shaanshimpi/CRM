@@ -158,7 +158,7 @@ async function seed() {
     }
 
     // Create Pipelines and Stages
-    const createdPipelines: { id: string; name: string }[] = []
+    const createdPipelines: { id: number; name: string }[] = []
     
     for (const pipelineInfo of pipelineData) {
       console.log(`📊 Creating pipeline: ${pipelineInfo.name}...`)
@@ -191,10 +191,10 @@ async function seed() {
         console.log(`   ✅ Created pipeline: ${pipeline.name}`)
       }
 
-      createdPipelines.push({ id: pipeline.id, name: pipeline.name })
+      createdPipelines.push({ id: pipeline.id as number, name: pipeline.name })
 
       // Create Stages for this pipeline
-      let defaultStageId: string | null = null
+      let defaultStageId: number | null = null
       
       for (const stageInfo of pipelineInfo.stages) {
         // Check if stage already exists
@@ -220,7 +220,7 @@ async function seed() {
         if (existingStage.docs.length > 0) {
           console.log(`   ⚠️  Stage "${stageInfo.name}" already exists, skipping...`)
           if (stageInfo.isDefault) {
-            defaultStageId = existingStage.docs[0].id
+            defaultStageId = existingStage.docs[0].id as number
           }
           continue
         }
@@ -235,12 +235,12 @@ async function seed() {
             description: stageInfo.description,
             isDefault: stageInfo.isDefault || false,
             isClosedStage: stageInfo.isClosedStage || false,
-            closedType: stageInfo.closedType || undefined,
+            closedType: (stageInfo.closedType as 'won' | 'lost' | undefined) || undefined,
           },
         })
 
         if (stageInfo.isDefault) {
-          defaultStageId = stage.id
+          defaultStageId = stage.id as number
         }
 
         console.log(`   ✅ Created stage: ${stage.name} (order: ${stage.order})`)
@@ -273,8 +273,8 @@ async function seed() {
       const company = getRandomItem(companies)
       const email = generateEmail(firstName, lastName, company)
       const phone = generatePhone()
-      const source = getRandomItem(leadSources)
-      const status = getRandomItem(leadStatuses)
+      const source = getRandomItem(leadSources) as 'website' | 'referral' | 'cold-call' | 'email-campaign' | 'social-media' | 'trade-show' | 'partner' | 'other'
+      const status = getRandomItem(leadStatuses) as 'new' | 'contacted' | 'qualified' | 'unqualified' | 'converted'
       const jobTitle = getRandomItem(jobTitles)
       const city = getRandomItem(cities)
       const state = getRandomItem(states)
@@ -346,16 +346,20 @@ async function seed() {
     })
 
     // Group stages by pipeline
-    const stagesByPipeline = new Map<string, typeof allStages.docs>()
+    const stagesByPipeline = new Map<number, typeof allStages.docs>()
     for (const stage of allStages.docs) {
-      const pipelineId = typeof stage.pipeline === 'string' 
+      const pipelineId = typeof stage.pipeline === 'number' 
         ? stage.pipeline 
-        : stage.pipeline?.id || ''
+        : typeof stage.pipeline === 'object' && stage.pipeline?.id
+          ? stage.pipeline.id as number
+          : null
       
-      if (!stagesByPipeline.has(pipelineId)) {
-        stagesByPipeline.set(pipelineId, [])
+      if (pipelineId !== null) {
+        if (!stagesByPipeline.has(pipelineId)) {
+          stagesByPipeline.set(pipelineId, [])
+        }
+        stagesByPipeline.get(pipelineId)?.push(stage)
       }
-      stagesByPipeline.get(pipelineId)?.push(stage)
     }
 
     for (const pipeline of createdPipelines) {
@@ -379,7 +383,7 @@ async function seed() {
         
         // Calculate value (1000 to 500000)
         const value = Math.floor(Math.random() * 499000) + 1000
-        const currency = getRandomItem(['INR', 'USD', 'EUR', 'GBP'])
+        const currency = getRandomItem(['INR', 'USD', 'EUR', 'GBP']) as 'INR' | 'USD' | 'EUR' | 'GBP'
         
         // Probability based on stage order (later stages = higher probability)
         const maxProbability = Math.min(30 + (stage.order * 15), 90)
@@ -417,8 +421,8 @@ async function seed() {
             data: {
               name: opportunityName,
               lead: linkedLead?.id || undefined,
-              pipeline: pipeline.id,
-              currentStage: stage.id,
+              pipeline: pipeline.id as number,
+              currentStage: stage.id as number,
               value,
               currency,
               probability,
@@ -429,7 +433,7 @@ async function seed() {
               contactEmail: generateEmail(firstName, lastName, company),
               contactPhone: generatePhone(),
               tags: getRandomItems(['enterprise', 'high-value', 'hot', 'qualified', 'mid-market'], Math.floor(Math.random() * 3) + 1),
-            },
+            } as any,
           })
           createdOpportunities++
           console.log(`   ✅ Created opportunity: ${opportunityName} (${company}) in ${pipeline.name} - ${stage.name}`)

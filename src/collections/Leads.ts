@@ -147,7 +147,7 @@ export const Leads: CollectionConfig = {
         description: 'User assigned to this lead',
         position: 'sidebar',
       },
-      filterOptions: ({ user }) => {
+      filterOptions: ({ user: _user }) => {
         // Only show active users
         return {
           isActive: {
@@ -254,7 +254,7 @@ export const Leads: CollectionConfig = {
       },
     ],
     afterChange: [
-      async ({ doc, previousDoc, operation, req }) => {
+      async ({ doc, previousDoc, operation, req: _req }) => {
         // Log activity when lead status changes
         if (operation === 'update' && previousDoc && doc.status !== previousDoc.status) {
           // This will be used in Phase 5 when Notes collection is created

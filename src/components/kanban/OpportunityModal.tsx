@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import type { KanbanOpportunity, KanbanColumn } from '../../endpoints/opportunities/kanban'
 
 interface OpportunityModalProps {
@@ -55,7 +55,24 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   onSave,
   apiUrl = '/api',
 }) => {
-  const [fullOpportunity, setFullOpportunity] = useState<any>(null)
+  const [fullOpportunity, setFullOpportunity] = useState<{
+    id?: string | number
+    name?: string
+    company?: string
+    contactName?: string
+    contactEmail?: string
+    contactPhone?: string
+    value?: number
+    currency?: string
+    probability?: number
+    expectedCloseDate?: string
+    assignedTo?: string | number | { id: string | number }
+    currentStage?: string | number | { id: string | number }
+    pipeline?: string | number | { id: string | number }
+    tasks?: Task[]
+    notes?: Note[]
+    reminders?: Reminder[]
+  } | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [users, setUsers] = useState<User[]>([])
@@ -83,12 +100,38 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   const [showAddNote, setShowAddNote] = useState(false)
   const [showAddReminder, setShowAddReminder] = useState(false)
 
+  const fetchFullOpportunity = useCallback(async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(`${apiUrl}/opportunities/${opportunity?.id}?depth=2`)
+      if (!response.ok) throw new Error('Failed to fetch opportunity')
+      const data = await response.json()
+      setFullOpportunity(data)
+    } catch (error) {
+      console.error('Failed to fetch opportunity:', error)
+      alert('Failed to load opportunity details')
+    } finally {
+      setLoading(false)
+    }
+  }, [apiUrl, opportunity?.id])
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const response = await fetch(`${apiUrl}/users?where[isActive][equals]=true&limit=100`)
+      if (!response.ok) return
+      const data = await response.json()
+      setUsers(data.docs || [])
+    } catch (error) {
+      console.error('Failed to fetch users:', error)
+    }
+  }, [apiUrl])
+
   useEffect(() => {
     if (opportunity?.id) {
       fetchFullOpportunity()
       fetchUsers()
     }
-  }, [opportunity?.id, apiUrl])
+  }, [opportunity?.id, fetchFullOpportunity, fetchUsers])
 
   useEffect(() => {
     if (fullOpportunity) {
@@ -108,32 +151,6 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
       setReminders(Array.isArray(fullOpportunity.reminders) ? fullOpportunity.reminders : [])
     }
   }, [fullOpportunity, currentStageId])
-
-  const fetchFullOpportunity = async () => {
-    setLoading(true)
-    try {
-      const response = await fetch(`${apiUrl}/opportunities/${opportunity?.id}?depth=2`)
-      if (!response.ok) throw new Error('Failed to fetch opportunity')
-      const data = await response.json()
-      setFullOpportunity(data)
-    } catch (error) {
-      console.error('Failed to fetch opportunity:', error)
-      alert('Failed to load opportunity details')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch(`${apiUrl}/users?where[isActive][equals]=true&limit=100`)
-      if (!response.ok) return
-      const data = await response.json()
-      setUsers(data.docs || [])
-    } catch (error) {
-      console.error('Failed to fetch users:', error)
-    }
-  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -167,7 +184,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
         ? (pipelineIdType === 'number' && /^\d+$/.test(String(pipelineId)) ? Number(pipelineId) : pipelineId)
         : undefined
 
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         name,
         company: company || undefined,
         contactName: contactName || undefined,
@@ -224,7 +241,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.errors 
-          ? errorData.errors.map((err: any) => err.message || err.path || 'Validation error').join(', ')
+          ? errorData.errors.map((err: { message?: string; path?: string }) => err.message || err.path || 'Validation error').join(', ')
           : errorData.message || `Failed to update opportunity (${response.status})`
         throw new Error(errorMessage)
       }
@@ -252,7 +269,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
     setShowAddTask(true)
   }
 
-  const updateTask = (index: number, field: keyof Task, value: any) => {
+  const updateTask = (index: number, field: keyof Task, value: Task[keyof Task]) => {
     const updated = [...tasks]
     updated[index] = { ...updated[index], [field]: value }
     setTasks(updated)
@@ -272,7 +289,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
     setShowAddNote(true)
   }
 
-  const updateNote = (index: number, field: keyof Note, value: any) => {
+  const updateNote = (index: number, field: keyof Note, value: Note[keyof Note]) => {
     const updated = [...notes]
     updated[index] = { ...updated[index], [field]: value }
     setNotes(updated)
@@ -294,7 +311,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
     setShowAddReminder(true)
   }
 
-  const updateReminder = (index: number, field: keyof Reminder, value: any) => {
+  const updateReminder = (index: number, field: keyof Reminder, value: Reminder[keyof Reminder]) => {
     const updated = [...reminders]
     updated[index] = { ...updated[index], [field]: value }
     setReminders(updated)
@@ -831,7 +848,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
             ))}
             {tasks.length === 0 && (
               <p style={{ fontSize: '0.875rem', color: 'hsl(var(--theme-text) / 0.5)', fontStyle: 'italic' }}>
-                No tasks yet. Click "Add Task" to create one.
+                No tasks yet. Click &quot;Add Task&quot; to create one.
               </p>
             )}
           </div>
@@ -923,7 +940,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
             ))}
             {notes.length === 0 && (
               <p style={{ fontSize: '0.875rem', color: 'hsl(var(--theme-text) / 0.5)', fontStyle: 'italic' }}>
-                No notes yet. Click "Add Note" to create one.
+                No notes yet. Click &quot;Add Note&quot; to create one.
               </p>
             )}
           </div>
@@ -1069,7 +1086,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
             ))}
             {reminders.length === 0 && (
               <p style={{ fontSize: '0.875rem', color: 'hsl(var(--theme-text) / 0.5)', fontStyle: 'italic' }}>
-                No reminders yet. Click "Add Reminder" to create one.
+                No reminders yet. Click &quot;Add Reminder&quot; to create one.
               </p>
             )}
           </div>
