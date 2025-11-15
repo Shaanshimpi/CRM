@@ -5,11 +5,13 @@ import type { KanbanColumn as KanbanColumnType, KanbanOpportunity } from '../../
 interface KanbanColumnProps {
   column: KanbanColumnType
   onCardClick?: (opportunity: KanbanOpportunity) => void
+  apiUrl?: string
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   column,
   onCardClick,
+  apiUrl = '/api',
 }) => {
 
   const formatCurrency = (value: number, currency?: string) => {
@@ -65,6 +67,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             key={opportunity.id}
             opportunity={opportunity}
             onClick={onCardClick}
+            apiUrl={apiUrl}
           />
         ))}
         {column.opportunities.length === 0 && (

@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { OpportunitiesListHeader } from '../components/kanban/OpportunitiesListHeader'
 
 export const Opportunities: CollectionConfig = {
   slug: 'opportunities',
@@ -7,6 +8,11 @@ export const Opportunities: CollectionConfig = {
     defaultColumns: ['name', 'pipeline', 'currentStage', 'value', 'assignedTo', 'expectedCloseDate'],
     description: 'Manage sales opportunities in pipelines. Use the Kanban View to visualize opportunities by stage.',
     listSearchableFields: ['name', 'company', 'contactName', 'contactEmail'],
+    components: {
+      beforeList: [
+        OpportunitiesListHeader,
+      ],
+    },
   },
   access: {
     read: () => true,

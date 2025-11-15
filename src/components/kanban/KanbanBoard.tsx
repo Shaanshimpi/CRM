@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { KanbanColumn } from './KanbanColumn'
 import { KanbanHeader } from './KanbanHeader'
 import { OpportunityModal } from './OpportunityModal'
+import { StageManagementModal } from './StageManagementModal'
 import { useKanbanData } from './hooks/useKanbanData'
 import type { KanbanOpportunity } from '../../endpoints/opportunities/kanban'
 
@@ -14,6 +15,7 @@ interface KanbanBoardProps {
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => {
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null)
   const [selectedOpportunity, setSelectedOpportunity] = useState<KanbanOpportunity | null>(null)
+  const [showStageManagement, setShowStageManagement] = useState(false)
 
   const { data, loading, error, refetch } = useKanbanData(selectedPipelineId, apiUrl)
 
@@ -46,7 +48,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
         const errorText = await response.text().catch(() => '')
         console.error('[KanbanBoard] Error response text:', errorText)
         
-        let errorData = {}
+        let errorData: { message?: string; error?: string } = {}
         try {
           errorData = JSON.parse(errorText)
         } catch {
@@ -71,6 +73,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
 
   const handleCloseModal = () => {
     setSelectedOpportunity(null)
+  }
+
+  const handleStagesUpdated = () => {
+    refetch()
   }
 
   if (!selectedPipelineId) {
@@ -163,6 +169,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
       <KanbanHeader
         selectedPipelineId={selectedPipelineId}
         onPipelineChange={setSelectedPipelineId}
+        onStagesManage={() => setShowStageManagement(true)}
+        onPipelineCreated={handleStagesUpdated}
         apiUrl={apiUrl}
       />
       
@@ -173,6 +181,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
               key={column.stage.id}
               column={column}
               onCardClick={handleCardClick}
+              apiUrl={apiUrl}
             />
           ))}
         </div>
@@ -186,6 +195,18 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
           currentStageId={selectedOpportunity.stage.id}
           onClose={handleCloseModal}
           onStageChange={handleStageChange}
+          onSave={() => refetch()}
+          apiUrl={apiUrl}
+        />
+      )}
+
+      {/* Stage Management Modal */}
+      {showStageManagement && selectedPipelineId && (
+        <StageManagementModal
+          isOpen={showStageManagement}
+          onClose={() => setShowStageManagement(false)}
+          pipelineId={selectedPipelineId}
+          onStagesUpdated={handleStagesUpdated}
           apiUrl={apiUrl}
         />
       )}

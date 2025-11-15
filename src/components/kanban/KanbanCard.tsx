@@ -1,15 +1,22 @@
-import React from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import type { KanbanOpportunity } from '../../endpoints/opportunities/kanban'
+import { KanbanCardTooltip } from './KanbanCardTooltip'
 
 interface KanbanCardProps {
   opportunity: KanbanOpportunity
   onClick?: (opportunity: KanbanOpportunity) => void
+  apiUrl?: string
 }
 
 export const KanbanCard: React.FC<KanbanCardProps> = ({
   opportunity,
   onClick,
+  apiUrl = '/api',
 }) => {
+  const [showTooltip, setShowTooltip] = useState(false)
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+  const cardRef = useRef<HTMLDivElement>(null)
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const formatCurrency = (value?: number, currency?: string) => {
     if (!value) return ''
@@ -55,11 +62,66 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     onClick?.(opportunity)
   }
 
+  useEffect(() => {
+    return () => {
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current)
+    }
+    
+    tooltipTimeoutRef.current = setTimeout(() => {
+      if (cardRef.current) {
+        const rect = cardRef.current.getBoundingClientRect()
+        const tooltipWidth = 500 // Max tooltip width
+        const tooltipHeight = window.innerHeight * 0.8 // Max tooltip height
+        const padding = 10
+
+        let x = rect.right + padding
+        let y = rect.top
+
+        // Adjust if tooltip would go off right edge
+        if (x + tooltipWidth > window.innerWidth - padding) {
+          x = rect.left - tooltipWidth - padding
+        }
+
+        // Adjust if tooltip would go off bottom edge
+        if (y + tooltipHeight > window.innerHeight - padding) {
+          y = window.innerHeight - tooltipHeight - padding
+        }
+
+        // Adjust if tooltip would go off top edge
+        if (y < padding) {
+          y = padding
+        }
+
+        setTooltipPosition({ x, y })
+        setShowTooltip(true)
+      }
+    }, 500) // Show tooltip after 500ms hover
+  }
+
+  const handleMouseLeave = () => {
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current)
+    }
+    setShowTooltip(false)
+  }
+
   return (
-    <div
-      className="kanban-card"
-      onClick={handleClick}
-    >
+    <>
+      <div
+        ref={cardRef}
+        className="kanban-card"
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
       {/* Header */}
       <div className="kanban-card-header">
         <h3 className="kanban-card-title">
@@ -78,6 +140,18 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       {/* Company */}
       {opportunity.company && (
         <div className="kanban-card-company">{opportunity.company}</div>
+      )}
+
+      {/* Contact Information */}
+      {(opportunity.contactName || opportunity.contactPhone) && (
+        <div className="kanban-card-contact">
+          {opportunity.contactName && (
+            <div className="kanban-card-contact-name">{opportunity.contactName}</div>
+          )}
+          {opportunity.contactPhone && (
+            <div className="kanban-card-contact-phone">{opportunity.contactPhone}</div>
+          )}
+        </div>
       )}
 
       {/* Value and Probability */}
@@ -141,6 +215,15 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
           )}
         </div>
       )}
-    </div>
+      </div>
+
+      {showTooltip && (
+        <KanbanCardTooltip
+          opportunity={opportunity}
+          position={tooltipPosition}
+          apiUrl={apiUrl}
+        />
+      )}
+    </>
   )
 }
