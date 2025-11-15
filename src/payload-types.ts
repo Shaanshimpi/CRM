@@ -69,6 +69,10 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    pipelines: Pipeline;
+    stages: Stage;
+    leads: Lead;
+    opportunities: Opportunity;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -78,13 +82,17 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    pipelines: PipelinesSelect<false> | PipelinesSelect<true>;
+    stages: StagesSelect<false> | StagesSelect<true>;
+    leads: LeadsSelect<false> | LeadsSelect<true>;
+    opportunities: OpportunitiesSelect<false> | OpportunitiesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
   };
   db: {
-    defaultIDType: string;
+    defaultIDType: number;
   };
   globals: {};
   globalsSelect: {};
@@ -120,7 +128,35 @@ export interface UserAuthOperations {
  * via the `definition` "users".
  */
 export interface User {
-  id: string;
+  id: number;
+  /**
+   * User's first name
+   */
+  firstName: string;
+  /**
+   * User's last name
+   */
+  lastName: string;
+  /**
+   * User role determines access permissions
+   */
+  role: 'admin' | 'manager' | 'sales-rep' | 'viewer';
+  /**
+   * User's department
+   */
+  department?: string | null;
+  /**
+   * User's phone number
+   */
+  phone?: string | null;
+  /**
+   * User profile picture
+   */
+  avatar?: (number | null) | Media;
+  /**
+   * Whether the user account is active
+   */
+  isActive?: boolean | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -144,7 +180,7 @@ export interface User {
  * via the `definition` "media".
  */
 export interface Media {
-  id: string;
+  id: number;
   alt: string;
   updatedAt: string;
   createdAt: string;
@@ -159,11 +195,364 @@ export interface Media {
   focalY?: number | null;
 }
 /**
+ * Manage sales and marketing pipelines (workflows)
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pipelines".
+ */
+export interface Pipeline {
+  id: number;
+  /**
+   * Pipeline name (e.g., "Sales Pipeline", "Marketing Pipeline")
+   */
+  name: string;
+  /**
+   * Brief description of this pipeline's purpose
+   */
+  description?: string | null;
+  /**
+   * Hex color code for this pipeline (used in UI)
+   */
+  color?: string | null;
+  /**
+   * Only active pipelines are available for use
+   */
+  isActive?: boolean | null;
+  /**
+   * Default stage for new opportunities in this pipeline
+   */
+  defaultStage?: (number | null) | Stage;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Manage stages within pipelines
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "stages".
+ */
+export interface Stage {
+  id: number;
+  /**
+   * Stage name (e.g., "New Lead", "Qualified", "Proposal")
+   */
+  name: string;
+  /**
+   * Pipeline this stage belongs to
+   */
+  pipeline: number | Pipeline;
+  /**
+   * Display order within the pipeline (lower numbers appear first)
+   */
+  order: number;
+  /**
+   * Hex color code for this stage (used in Kanban view)
+   */
+  color?: string | null;
+  /**
+   * Brief description of this stage
+   */
+  description?: string | null;
+  /**
+   * Set as default stage for new opportunities in this pipeline
+   */
+  isDefault?: boolean | null;
+  /**
+   * Mark this as a closed stage (won or lost)
+   */
+  isClosedStage?: boolean | null;
+  /**
+   * Type of closed stage
+   */
+  closedType?: ('won' | 'lost') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Manage leads and convert them to opportunities
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "leads".
+ */
+export interface Lead {
+  id: number;
+  /**
+   * Lead's first name
+   */
+  firstName: string;
+  /**
+   * Lead's last name
+   */
+  lastName: string;
+  /**
+   * Lead's email address
+   */
+  email?: string | null;
+  /**
+   * Lead's phone number
+   */
+  phone?: string | null;
+  /**
+   * Company name
+   */
+  company?: string | null;
+  /**
+   * Job title
+   */
+  jobTitle?: string | null;
+  /**
+   * Where did this lead come from?
+   */
+  source: 'website' | 'referral' | 'cold-call' | 'email-campaign' | 'social-media' | 'trade-show' | 'partner' | 'other';
+  /**
+   * Current status of the lead
+   */
+  status: 'new' | 'contacted' | 'qualified' | 'unqualified' | 'converted';
+  /**
+   * User assigned to this lead
+   */
+  assignedTo?: (number | null) | User;
+  /**
+   * Lead's address
+   */
+  address?: {
+    street?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
+    country?: string | null;
+  };
+  /**
+   * Tags for categorizing leads
+   */
+  tags?: string[] | null;
+  /**
+   * Custom fields (flexible JSON data)
+   */
+  customFields?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Opportunity created from this lead
+   */
+  convertedToOpportunity?: (number | null) | Opportunity;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Manage sales opportunities in pipelines. Use the Kanban View to visualize opportunities by stage.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "opportunities".
+ */
+export interface Opportunity {
+  id: number;
+  /**
+   * Opportunity name or deal name
+   */
+  name: string;
+  /**
+   * Lead this opportunity was converted from
+   */
+  lead?: (number | null) | Lead;
+  /**
+   * Pipeline this opportunity belongs to
+   */
+  pipeline: number | Pipeline;
+  /**
+   * Current stage in the pipeline
+   */
+  currentStage: number | Stage;
+  /**
+   * Deal value
+   */
+  value?: number | null;
+  /**
+   * Currency for deal value
+   */
+  currency?: ('INR' | 'USD' | 'EUR' | 'GBP') | null;
+  /**
+   * Win probability percentage (0-100)
+   */
+  probability?: number | null;
+  /**
+   * Expected date to close this deal
+   */
+  expectedCloseDate?: string | null;
+  /**
+   * Actual date when deal was closed
+   */
+  actualCloseDate?: string | null;
+  /**
+   * User assigned to this opportunity
+   */
+  assignedTo: number | User;
+  /**
+   * Company name
+   */
+  company?: string | null;
+  /**
+   * Primary contact name
+   */
+  contactName?: string | null;
+  /**
+   * Primary contact email
+   */
+  contactEmail?: string | null;
+  /**
+   * Primary contact phone
+   */
+  contactPhone?: string | null;
+  /**
+   * Tags for categorizing opportunities
+   */
+  tags?: string[] | null;
+  /**
+   * Custom fields (flexible JSON data)
+   */
+  customFields?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * History of stage changes
+   */
+  stageHistory?:
+    | {
+        stage?: (number | null) | Stage;
+        changedAt?: string | null;
+        changedBy?: (number | null) | User;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Notes related to this opportunity
+   */
+  notes?:
+    | {
+        /**
+         * Note content
+         */
+        content: string;
+        /**
+         * Mark as private note
+         */
+        isPrivate?: boolean | null;
+        /**
+         * Tags for this note
+         */
+        tags?: string[] | null;
+        /**
+         * User who created this note
+         */
+        createdBy?: (number | null) | User;
+        /**
+         * When this note was created
+         */
+        createdAt?: string | null;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Tasks related to this opportunity
+   */
+  tasks?:
+    | {
+        /**
+         * Task title
+         */
+        title: string;
+        /**
+         * Task description
+         */
+        description?: string | null;
+        /**
+         * Task status
+         */
+        status?: ('pending' | 'inProgress' | 'completed' | 'cancelled') | null;
+        /**
+         * Task priority
+         */
+        priority?: ('low' | 'medium' | 'high' | 'urgent') | null;
+        /**
+         * Task due date
+         */
+        dueDate?: string | null;
+        /**
+         * User assigned to this task
+         */
+        assignedTo?: (number | null) | User;
+        /**
+         * When this task was completed
+         */
+        completedAt?: string | null;
+        /**
+         * User who created this task
+         */
+        createdBy?: (number | null) | User;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * Reminders related to this opportunity
+   */
+  reminders?:
+    | {
+        /**
+         * Reminder title
+         */
+        title: string;
+        /**
+         * Reminder description
+         */
+        description?: string | null;
+        /**
+         * Date for the reminder
+         */
+        reminderDate: string;
+        /**
+         * Reminder type
+         */
+        type?: ('in-app' | 'email' | 'sms' | 'call') | null;
+        /**
+         * Reminder status
+         */
+        status?: ('pending' | 'sent' | 'dismissed') | null;
+        /**
+         * When this reminder was sent
+         */
+        sentAt?: string | null;
+        /**
+         * When this reminder was dismissed
+         */
+        dismissedAt?: string | null;
+        /**
+         * User who created this reminder
+         */
+        createdBy?: (number | null) | User;
+        id?: string | null;
+      }[]
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
-  id: string;
+  id: number;
   key: string;
   data:
     | {
@@ -180,20 +569,36 @@ export interface PayloadKv {
  * via the `definition` "payload-locked-documents".
  */
 export interface PayloadLockedDocument {
-  id: string;
+  id: number;
   document?:
     | ({
         relationTo: 'users';
-        value: string | User;
+        value: number | User;
       } | null)
     | ({
         relationTo: 'media';
-        value: string | Media;
+        value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'pipelines';
+        value: number | Pipeline;
+      } | null)
+    | ({
+        relationTo: 'stages';
+        value: number | Stage;
+      } | null)
+    | ({
+        relationTo: 'leads';
+        value: number | Lead;
+      } | null)
+    | ({
+        relationTo: 'opportunities';
+        value: number | Opportunity;
       } | null);
   globalSlug?: string | null;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   updatedAt: string;
   createdAt: string;
@@ -203,10 +608,10 @@ export interface PayloadLockedDocument {
  * via the `definition` "payload-preferences".
  */
 export interface PayloadPreference {
-  id: string;
+  id: number;
   user: {
     relationTo: 'users';
-    value: string | User;
+    value: number | User;
   };
   key?: string | null;
   value?:
@@ -226,7 +631,7 @@ export interface PayloadPreference {
  * via the `definition` "payload-migrations".
  */
 export interface PayloadMigration {
-  id: string;
+  id: number;
   name?: string | null;
   batch?: number | null;
   updatedAt: string;
@@ -237,6 +642,13 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  firstName?: T;
+  lastName?: T;
+  role?: T;
+  department?: T;
+  phone?: T;
+  avatar?: T;
+  isActive?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -271,6 +683,132 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pipelines_select".
+ */
+export interface PipelinesSelect<T extends boolean = true> {
+  name?: T;
+  description?: T;
+  color?: T;
+  isActive?: T;
+  defaultStage?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "stages_select".
+ */
+export interface StagesSelect<T extends boolean = true> {
+  name?: T;
+  pipeline?: T;
+  order?: T;
+  color?: T;
+  description?: T;
+  isDefault?: T;
+  isClosedStage?: T;
+  closedType?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "leads_select".
+ */
+export interface LeadsSelect<T extends boolean = true> {
+  firstName?: T;
+  lastName?: T;
+  email?: T;
+  phone?: T;
+  company?: T;
+  jobTitle?: T;
+  source?: T;
+  status?: T;
+  assignedTo?: T;
+  address?:
+    | T
+    | {
+        street?: T;
+        city?: T;
+        state?: T;
+        zip?: T;
+        country?: T;
+      };
+  tags?: T;
+  customFields?: T;
+  convertedToOpportunity?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "opportunities_select".
+ */
+export interface OpportunitiesSelect<T extends boolean = true> {
+  name?: T;
+  lead?: T;
+  pipeline?: T;
+  currentStage?: T;
+  value?: T;
+  currency?: T;
+  probability?: T;
+  expectedCloseDate?: T;
+  actualCloseDate?: T;
+  assignedTo?: T;
+  company?: T;
+  contactName?: T;
+  contactEmail?: T;
+  contactPhone?: T;
+  tags?: T;
+  customFields?: T;
+  stageHistory?:
+    | T
+    | {
+        stage?: T;
+        changedAt?: T;
+        changedBy?: T;
+        id?: T;
+      };
+  notes?:
+    | T
+    | {
+        content?: T;
+        isPrivate?: T;
+        tags?: T;
+        createdBy?: T;
+        createdAt?: T;
+        id?: T;
+      };
+  tasks?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        status?: T;
+        priority?: T;
+        dueDate?: T;
+        assignedTo?: T;
+        completedAt?: T;
+        createdBy?: T;
+        id?: T;
+      };
+  reminders?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+        reminderDate?: T;
+        type?: T;
+        status?: T;
+        sentAt?: T;
+        dismissedAt?: T;
+        createdBy?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

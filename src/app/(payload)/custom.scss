@@ -1,0 +1,55 @@
+// Tailwind CSS directives for Payload admin panel
+// Note: We disable preflight in tailwind.config.ts to avoid conflicts with Payload's styles
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+// Payload CSS Variables - Match Payload's design system
+:root {
+  --theme-bg: 0 0% 100%;
+  --theme-text: 0 0% 3.9%;
+  --theme-border-color: 0 0% 89.8%;
+  --theme-elevation-0: 0 0% 100%;
+  --theme-elevation-1: 0 0% 96.1%;
+  --theme-elevation-2: 0 0% 89.8%;
+  --theme-success-500: 142.1 76.2% 36.3%;
+  --theme-error-500: 0 84.2% 60.2%;
+  --theme-warning-500: 38.7 92% 50%;
+  --radius: 0.5rem;
+}
+
+[data-theme='dark'] {
+  --theme-bg: 0 0% 3.9%;
+  --theme-text: 0 0% 98%;
+  --theme-border-color: 0 0% 14.9%;
+  --theme-elevation-0: 0 0% 3.9%;
+  --theme-elevation-1: 0 0% 7.8%;
+  --theme-elevation-2: 0 0% 14.9%;
+}
+
+// Custom CRM Admin Styles
+.crm-admin-container {
+  width: 100%;
+}
+
+// Ensure Payload components use Tailwind utilities
+.payload-admin-ui {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// Additional custom styles for CRM components
+// These will be added as we build components
+
+// Kanban View Styles - Match Payload's Design System
+.kanban-view-container {
+  width: 100%;
+  height: 100%;
+  background: hsl(var(--theme-elevation-0));
+  color: hsl(var(--theme-text));
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// Kanban styles moved to kanban.scss for better organization
