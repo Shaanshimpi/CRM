@@ -58,6 +58,16 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   apiUrl = '/api',
 }) => {
   const isCreateMode = !opportunity
+  
+  // Log when modal receives props to debug pipeline/stage mismatches
+  console.log('[OpportunityModal] Modal opened/re-rendered:', {
+    isCreateMode,
+    pipelineId,
+    currentStageId,
+    columnsCount: columns?.length || 0,
+    columnsPipelineIds: columns?.map(col => col.stage.id) || [],
+    firstColumnStageId: columns?.[0]?.stage?.id,
+  })
   const [fullOpportunity, setFullOpportunity] = useState<{
     id?: string | number
     name?: string
@@ -138,13 +148,49 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   useEffect(() => {
     if (opportunity?.id) {
       fetchFullOpportunity()
+    } else if (isCreateMode) {
+      // Reset form fields when creating new opportunity
+      setName('')
+      setCompany('')
+      setContactName('')
+      setContactEmail('')
+      setContactPhone('')
+      setValue('')
+      setCurrency('INR')
+      setProbability('')
+      setExpectedCloseDate('')
+      setAssignedTo('')
+      
+      // Ensure we use a stage from the columns that belong to the selected pipeline
+      // The columns are already filtered by pipeline from the kanban endpoint
+      if (columns && columns.length > 0) {
+        const firstStageId = String(columns[0].stage.id)
+        console.log('[OpportunityModal] Setting default stage for new opportunity:', {
+          firstStageId,
+          pipelineId,
+          stageName: columns[0].stage.name,
+          columnsCount: columns.length,
+          allStages: columns.map(col => ({ id: col.stage.id, name: col.stage.name })),
+          currentStageIdFromProps: currentStageId,
+        })
+        setSelectedStageId(firstStageId)
+      } else {
+        console.warn('[OpportunityModal] No columns available, using currentStageId from props:', currentStageId)
+        // Fallback to currentStageId if columns not available yet
+        setSelectedStageId(currentStageId)
+      }
+      
+      setTasks([])
+      setNotes([])
+      setReminders([])
+      setLeadId(null)
     }
     // Always fetch users for assignee selection
     fetchUsers()
-  }, [opportunity?.id, fetchFullOpportunity, fetchUsers])
+  }, [opportunity?.id, isCreateMode, currentStageId, columns, pipelineId, fetchFullOpportunity, fetchUsers])
 
   useEffect(() => {
-    if (fullOpportunity) {
+    if (fullOpportunity && !isCreateMode) {
       setName(fullOpportunity.name || '')
       setCompany(fullOpportunity.company || '')
       setContactName(fullOpportunity.contactName || '')
@@ -160,7 +206,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
       setNotes(Array.isArray(fullOpportunity.notes) ? fullOpportunity.notes : [])
       setReminders(Array.isArray(fullOpportunity.reminders) ? fullOpportunity.reminders : [])
     }
-  }, [fullOpportunity, currentStageId])
+  }, [fullOpportunity, currentStageId, isCreateMode])
 
   const handleCreateLead = async () => {
     if (!contactEmail || !contactName) {
@@ -169,11 +215,46 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
     }
 
     try {
-      const [firstName, ...lastNameParts] = contactName.trim().split(' ')
-      const lastName = lastNameParts.join(' ') || ''
+      const trimmedName = contactName.trim()
+      const nameParts = trimmedName.split(' ').filter(part => part.length > 0)
+      
+      console.log('[OpportunityModal] Creating lead - Debug:', {
+        contactName,
+        trimmedName,
+        nameParts,
+        namePartsLength: nameParts.length,
+      })
+      
+      // If name has multiple parts, use first as firstName and rest as lastName
+      // If only one part, use it as firstName and use a placeholder for lastName
+      let firstName = (nameParts[0] || 'Unknown').trim()
+      let lastName = nameParts.length > 1 
+        ? nameParts.slice(1).join(' ').trim() 
+        : (firstName || 'Unknown') // Use firstName as lastName fallback if no last name provided
+      
+      // Ensure both firstName and lastName are never empty (Payload requires them)
+      if (!firstName || firstName.trim() === '') {
+        firstName = 'Unknown'
+      }
+      if (!lastName || lastName.trim() === '') {
+        console.warn('[OpportunityModal] lastName is empty, using firstName as fallback')
+        lastName = firstName || 'Unknown'
+      }
+      
+      // Final safety check - ensure both have values
+      firstName = firstName.trim() || 'Unknown'
+      lastName = lastName.trim() || firstName.trim() || 'Unknown'
+      
+      console.log('[OpportunityModal] Parsed names:', {
+        firstName,
+        lastName,
+        firstNameLength: firstName?.length || 0,
+        lastNameLength: lastName?.length || 0,
+        lastNameIsEmpty: !lastName || lastName.trim() === '',
+      })
       
       const leadData = {
-        firstName: firstName || contactName,
+        firstName: firstName,
         lastName: lastName,
         email: contactEmail,
         phone: contactPhone || undefined,
@@ -181,6 +262,9 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
         source: 'website',
         status: 'new',
       }
+
+      console.log('[OpportunityModal] Lead data to send:', JSON.stringify(leadData, null, 2))
+      console.log('[OpportunityModal] Lead data lastName type:', typeof leadData.lastName, 'value:', leadData.lastName)
 
       const response = await fetch(`${apiUrl}/leads`, {
         method: 'POST',
@@ -192,10 +276,21 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || 'Failed to create lead')
+        console.error('[OpportunityModal] Lead creation failed - Error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          leadDataSent: leadData,
+        })
+        // Extract validation errors if available
+        const errorMessage = errorData.errors 
+          ? errorData.errors.map((err: { message?: string; path?: string }) => err.message || `${err.path}: invalid`).join(', ')
+          : errorData.message || `Failed to create lead (${response.status})`
+        throw new Error(errorMessage)
       }
 
       const created = await response.json()
+      console.log('[OpportunityModal] Lead created successfully:', created)
       setLeadId(created.doc.id)
       setCreateLead(false)
       alert('Lead created successfully!')
@@ -245,6 +340,45 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
       const convertedPipelineId = pipelineId && /^\d+$/.test(String(pipelineId))
         ? Number(pipelineId)
         : pipelineId
+
+      // Verify the selected stage exists in the columns (which are filtered by pipeline)
+      console.log('[OpportunityModal] Before save - verifying stage:', {
+        selectedStageId,
+        pipelineId,
+        columnsCount: columns.length,
+        availableStages: columns.map(col => ({ id: String(col.stage.id), name: col.stage.name })),
+        selectedStageIdString: String(selectedStageId),
+      })
+      
+      const selectedStage = columns.find(col => String(col.stage.id) === String(selectedStageId))
+      if (!selectedStage && isCreateMode) {
+        console.error('[OpportunityModal] Selected stage not found in columns:', {
+          selectedStageId,
+          selectedStageIdType: typeof selectedStageId,
+          pipelineId,
+          availableStages: columns.map(col => ({ id: String(col.stage.id), name: col.stage.name, idType: typeof col.stage.id })),
+          matchAttempts: columns.map(col => ({
+            colStageId: String(col.stage.id),
+            selectedStageId: String(selectedStageId),
+            match: String(col.stage.id) === String(selectedStageId),
+          })),
+        })
+        alert(`Selected stage (ID: ${selectedStageId}) does not belong to the selected pipeline (ID: ${pipelineId}). Please select a valid stage.`)
+        setSaving(false)
+        return
+      }
+
+      console.log('[OpportunityModal] Creating opportunity - Debug:', {
+        convertedStageId,
+        convertedPipelineId,
+        stageIdType: typeof convertedStageId,
+        pipelineIdType: typeof convertedPipelineId,
+        selectedStageId,
+        pipelineId,
+        selectedStageName: selectedStage?.stage.name,
+        columns: columns.map(col => ({ id: col.stage.id, name: col.stage.name })),
+        isCreateMode,
+      })
 
       const opportunityData: Record<string, unknown> = {
         name,
@@ -506,7 +640,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Opportunity Name"
+            placeholder="Opportunity Name *"
             style={{
               fontSize: '1.25rem',
               fontWeight: 600,
@@ -761,7 +895,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem', color: 'hsl(var(--theme-text) / 0.7)' }}>
-                  Assigned To
+                  Assigned To <span style={{ color: 'hsl(var(--theme-error-500))' }}>*</span>
                 </label>
                 <select
                   value={assignedTo}
@@ -786,7 +920,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', marginBottom: '0.25rem', color: 'hsl(var(--theme-text) / 0.7)' }}>
-                  Stage
+                  Stage <span style={{ color: 'hsl(var(--theme-error-500))' }}>*</span>
                 </label>
                 <select
                   value={selectedStageId}
@@ -801,11 +935,20 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
                     fontSize: '0.875rem',
                   }}
                 >
-                  {columns.map((column) => (
-                    <option key={column.stage.id} value={column.stage.id}>
-                      {column.stage.name}
-                    </option>
-                  ))}
+                  {columns
+                    .filter((column) => {
+                      // In create mode, ensure we only show stages from the selected pipeline
+                      if (isCreateMode && pipelineId) {
+                        // Columns are already filtered by pipeline, but double-check
+                        return true
+                      }
+                      return true
+                    })
+                    .map((column) => (
+                      <option key={column.stage.id} value={column.stage.id}>
+                        {column.stage.name}
+                      </option>
+                    ))}
                 </select>
               </div>
             </div>

@@ -44,6 +44,11 @@ export default buildConfig({
         Logo: './components/admin/FireFistLogo#FireFistLogo',
         Icon: './components/admin/FireFistIcon#FireFistIcon',
       },
+      // Dashboard widgets - shown at the top of admin dashboard
+      beforeDashboard: [
+        './components/admin/dashboard/FireFistHero#FireFistHero',
+        './components/admin/dashboard/DashboardWidgets#DashboardWidgets',
+      ],
     },
   },
   collections: [Users, Media, Pipelines, Stages, Leads, Opportunities],

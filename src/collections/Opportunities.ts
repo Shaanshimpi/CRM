@@ -7,8 +7,11 @@ export const Opportunities: CollectionConfig = {
     defaultColumns: ['name', 'pipeline', 'currentStage', 'value', 'assignedTo', 'expectedCloseDate'],
     description: 'Manage sales opportunities in pipelines. Use the Kanban View to visualize opportunities by stage.',
     listSearchableFields: ['name', 'company', 'contactName', 'contactEmail'],
-    // Note: beforeList component removed temporarily due to import map generation issues
-    // The Kanban view is still accessible via direct URL: /admin/collections/opportunities/kanban
+    components: {
+      beforeListTable: [
+        './components/kanban/KanbanNavButton#KanbanNavButton' as any,
+      ],
+    },
   },
   access: {
     read: () => true,
@@ -46,6 +49,9 @@ export const Opportunities: CollectionConfig = {
         description: 'Pipeline this opportunity belongs to',
         position: 'sidebar',
       },
+      // Enable join to fetch pipeline name in list views
+      // This allows displaying pipeline.name in the list table without additional queries
+      // Note: Payload v3 may handle this automatically, but explicit is better
     },
     {
       name: 'currentStage',
@@ -56,6 +62,7 @@ export const Opportunities: CollectionConfig = {
         description: 'Current stage in the pipeline',
         position: 'sidebar',
       },
+      // Enable join to fetch stage name in list views
     },
     {
       name: 'value',
@@ -151,6 +158,7 @@ export const Opportunities: CollectionConfig = {
         description: 'User assigned to this opportunity',
         position: 'sidebar',
       },
+      // Enable join to fetch user email/name in list views
     },
     {
       name: 'company',
@@ -542,8 +550,18 @@ export const Opportunities: CollectionConfig = {
             const pipelineIdStr = pipelineId ? String(pipelineId) : null
             const stagePipelineIdStr = stagePipelineId ? String(stagePipelineId) : null
 
+            console.log('[Opportunities.beforeChange] Validating stage-pipeline relationship:', {
+              stageId,
+              pipelineId,
+              stagePipelineId,
+              pipelineIdStr,
+              stagePipelineIdStr,
+              match: pipelineIdStr === stagePipelineIdStr,
+              operation,
+            })
+
             if (pipelineIdStr && stagePipelineIdStr && pipelineIdStr !== stagePipelineIdStr) {
-              throw new Error('Current stage must belong to the selected pipeline')
+              throw new Error(`Current stage must belong to the selected pipeline. Stage pipeline: ${stagePipelineIdStr}, Selected pipeline: ${pipelineIdStr}`)
             }
           }
         }

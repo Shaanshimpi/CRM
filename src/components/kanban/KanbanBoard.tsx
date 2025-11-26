@@ -208,19 +208,46 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
 
       {/* Opportunity Modal - Create New */}
       {showNewOpportunity && data && selectedPipelineId && (
-        <OpportunityModal
-          opportunity={null}
-          columns={data.columns}
-          currentStageId={data.columns[0]?.stage?.id || ''}
-          pipelineId={selectedPipelineId}
-          onClose={() => setShowNewOpportunity(false)}
-          onStageChange={async () => {}}
-          onSave={() => {
+        (() => {
+          // Verify data matches selected pipeline
+          const dataPipelineId = String(data.pipeline.id)
+          const selectedPipelineIdStr = String(selectedPipelineId)
+          
+          if (dataPipelineId !== selectedPipelineIdStr) {
+            console.error('[KanbanBoard] Pipeline mismatch when creating opportunity:', {
+              dataPipelineId,
+              selectedPipelineId: selectedPipelineIdStr,
+              dataPipelineName: data.pipeline.name,
+            })
+            // Refetch data to ensure we have the correct pipeline
             refetch()
-            setShowNewOpportunity(false)
-          }}
-          apiUrl={apiUrl}
-        />
+            return null
+          }
+          
+          console.log('[KanbanBoard] Opening new opportunity modal:', {
+            pipelineId: selectedPipelineId,
+            pipelineName: data.pipeline.name,
+            columnsCount: data.columns.length,
+            firstStageId: data.columns[0]?.stage?.id,
+            firstStageName: data.columns[0]?.stage?.name,
+          })
+          
+          return (
+            <OpportunityModal
+              opportunity={null}
+              columns={data.columns}
+              currentStageId={data.columns[0]?.stage?.id || ''}
+              pipelineId={selectedPipelineId}
+              onClose={() => setShowNewOpportunity(false)}
+              onStageChange={async () => {}}
+              onSave={() => {
+                refetch()
+                setShowNewOpportunity(false)
+              }}
+              apiUrl={apiUrl}
+            />
+          )
+        })()
       )}
 
       {/* Stage Management Modal */}
