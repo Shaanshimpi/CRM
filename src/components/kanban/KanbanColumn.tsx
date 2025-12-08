@@ -13,7 +13,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onCardClick,
   apiUrl = '/api',
 }) => {
-
   const formatCurrency = (value: number, currency?: string) => {
     const currencyCode = currency || 'INR'
     const formatter = new Intl.NumberFormat('en-IN', {

@@ -515,6 +515,16 @@ export const Opportunities: CollectionConfig = {
         },
       ],
     },
+    {
+      name: 'remindersRelationship',
+      type: 'relationship',
+      relationTo: 'reminders',
+      hasMany: true,
+      admin: {
+        description: 'Linked reminders (new system)',
+        position: 'sidebar',
+      },
+    },
   ],
   hooks: {
     beforeChange: [

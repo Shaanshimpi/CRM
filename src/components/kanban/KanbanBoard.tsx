@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { KanbanColumn } from './KanbanColumn'
-import { KanbanHeader } from './KanbanHeader'
+import { KanbanHeader, type Pipeline } from './KanbanHeader'
 import { OpportunityModal } from './OpportunityModal'
 import { StageManagementModal } from './StageManagementModal'
+import { NewOpportunityModal } from './NewOpportunityModal'
 import { useKanbanData } from './hooks/useKanbanData'
 import type { KanbanOpportunity } from '../../endpoints/opportunities/kanban'
 
@@ -14,11 +15,114 @@ interface KanbanBoardProps {
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => {
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null)
+  
+  // Helper to normalize pipeline ID to string
+  const setPipelineId = (id: string | number | null) => {
+    if (id === null) {
+      setSelectedPipelineId(null)
+    } else {
+      setSelectedPipelineId(String(id))
+    }
+  }
   const [selectedOpportunity, setSelectedOpportunity] = useState<KanbanOpportunity | null>(null)
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(null)
   const [showStageManagement, setShowStageManagement] = useState(false)
   const [showNewOpportunity, setShowNewOpportunity] = useState(false)
+  const [owners, setOwners] = useState<
+    Array<{
+      id: string
+      email: string
+      firstName?: string
+      lastName?: string
+    }>
+  >([])
+  const [ownersLoading, setOwnersLoading] = useState(false)
+  const [pipelines, setPipelines] = useState<Pipeline[]>([])
+  const [pipelinesLoading, setPipelinesLoading] = useState(false)
+  const { data, loading, error, refetch } = useKanbanData(selectedPipelineId, apiUrl, selectedOwnerId)
 
-  const { data, loading, error, refetch } = useKanbanData(selectedPipelineId, apiUrl)
+  // Verify that loaded data matches selected pipeline
+  useEffect(() => {
+    if (data && selectedPipelineId) {
+      const dataPipelineId = String(data.pipeline.id)
+      const selectedPipelineIdStr = String(selectedPipelineId)
+      
+      if (dataPipelineId !== selectedPipelineIdStr) {
+        console.error('[KanbanBoard] Pipeline mismatch detected!', {
+          selectedPipelineId: selectedPipelineIdStr,
+          dataPipelineId,
+          dataPipelineName: data.pipeline.name,
+          selectedPipelineName: pipelines.find(p => String(p.id) === selectedPipelineIdStr)?.name,
+        })
+        // Auto-correct: refetch with the correct pipeline
+        // This can happen if the pipeline was changed while data was loading
+        refetch()
+      } else {
+        console.log('[KanbanBoard] Pipeline verified:', {
+          pipelineId: dataPipelineId,
+          pipelineName: data.pipeline.name,
+          selectedPipelineName: pipelines.find(p => String(p.id) === selectedPipelineIdStr)?.name,
+          match: true,
+        })
+      }
+    }
+  }, [data, selectedPipelineId, pipelines, refetch])
+
+  useEffect(() => {
+    const fetchOwners = async () => {
+      setOwnersLoading(true)
+      try {
+        const response = await fetch(`${apiUrl}/users?limit=200&depth=0`)
+        if (response.ok) {
+          const result = await response.json()
+          setOwners(result.docs || [])
+        }
+      } catch (err) {
+        console.error('[KanbanBoard] Failed to fetch owners', err)
+      } finally {
+        setOwnersLoading(false)
+      }
+    }
+
+    void fetchOwners()
+  }, [apiUrl])
+
+  useEffect(() => {
+    const fetchPipelines = async () => {
+      setPipelinesLoading(true)
+      try {
+        const response = await fetch(`${apiUrl}/pipelines?where[isActive][equals]=true&limit=100`)
+        if (response.ok) {
+          const result = await response.json()
+          const docs: Pipeline[] = (result.docs || []).map((p: { id: string | number; name: string; isActive: boolean }) => ({
+            ...p,
+            id: String(p.id), // Normalize all IDs to strings
+          }))
+          setPipelines(docs)
+          
+          // Auto-select first pipeline if none selected
+          if (!selectedPipelineId && docs.length > 0) {
+            setPipelineId(docs[0].id)
+          }
+          
+          // Verify selected pipeline still exists, if not reset to first
+          if (selectedPipelineId && docs.length > 0) {
+            const selectedExists = docs.some(p => p.id === selectedPipelineId)
+            if (!selectedExists) {
+              console.warn('[KanbanBoard] Selected pipeline no longer exists, switching to first available')
+              setPipelineId(docs[0].id)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[KanbanBoard] Failed to fetch pipelines', err)
+      } finally {
+        setPipelinesLoading(false)
+      }
+    }
+
+    void fetchPipelines()
+  }, [apiUrl, selectedPipelineId])
 
   const handleCardClick = (opportunity: KanbanOpportunity) => {
     setSelectedOpportunity(opportunity)
@@ -80,12 +184,82 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
     refetch()
   }
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event
+    setActiveId(active.id as string)
+    
+    // Find the opportunity being dragged
+    if (data) {
+      for (const column of data.columns) {
+        const opportunity = column.opportunities.find(opp => String(opp.id) === String(active.id))
+        if (opportunity) {
+          setDraggedOpportunity(opportunity)
+          break
+        }
+      }
+    }
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    console.log('[KanbanBoard] Drag end:', { activeId: active.id, overId: over?.id, hasData: !!data })
+    
+    setActiveId(null)
+    setDraggedOpportunity(null)
+
+    if (!over || !data) {
+      console.log('[KanbanBoard] Drag end cancelled:', { over: over?.id, hasData: !!data })
+      return
+    }
+
+    const opportunityId = String(active.id)
+    const newStageId = String(over.id)
+
+    console.log('[KanbanBoard] Processing drag end:', { opportunityId, newStageId })
+
+    // Find the current opportunity to check if stage actually changed
+    let currentStageId: string | null = null
+    for (const column of data.columns) {
+      const opportunity = column.opportunities.find(opp => String(opp.id) === opportunityId)
+      if (opportunity) {
+        currentStageId = String(opportunity.stage.id)
+        console.log('[KanbanBoard] Found opportunity:', { opportunityId, currentStageId, newStageId })
+        break
+      }
+    }
+
+    // Only update if stage actually changed
+    if (currentStageId && currentStageId !== newStageId) {
+      console.log('[KanbanBoard] Stage changed, updating:', { opportunityId, from: currentStageId, to: newStageId })
+      try {
+        await handleStageChange(opportunityId, newStageId)
+        console.log('[KanbanBoard] Stage update successful')
+      } catch (error) {
+        console.error('[KanbanBoard] Drag and drop failed:', error)
+        // Optionally show error message to user
+      }
+    } else {
+      console.log('[KanbanBoard] Stage unchanged or opportunity not found:', { currentStageId, newStageId, opportunityId })
+    }
+  }
+
+  const handleDragCancel = () => {
+    setActiveId(null)
+    setDraggedOpportunity(null)
+  }
+
   if (!selectedPipelineId) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <KanbanHeader
           selectedPipelineId={selectedPipelineId}
           onPipelineChange={setSelectedPipelineId}
+          selectedOwnerId={selectedOwnerId}
+          onOwnerChange={setSelectedOwnerId}
+          owners={owners}
+          ownersLoading={ownersLoading}
+          pipelines={pipelines}
+          pipelinesLoading={pipelinesLoading}
           apiUrl={apiUrl}
         />
         <div className="kanban-empty">
@@ -101,6 +275,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
         <KanbanHeader
           selectedPipelineId={selectedPipelineId}
           onPipelineChange={setSelectedPipelineId}
+          selectedOwnerId={selectedOwnerId}
+          onOwnerChange={setSelectedOwnerId}
+          owners={owners}
+          ownersLoading={ownersLoading}
+          pipelines={pipelines}
+          pipelinesLoading={pipelinesLoading}
           apiUrl={apiUrl}
         />
         <div className="kanban-loading">
@@ -117,6 +297,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
         <KanbanHeader
           selectedPipelineId={selectedPipelineId}
           onPipelineChange={setSelectedPipelineId}
+          selectedOwnerId={selectedOwnerId}
+          onOwnerChange={setSelectedOwnerId}
+          owners={owners}
+          ownersLoading={ownersLoading}
+          pipelines={pipelines}
+          pipelinesLoading={pipelinesLoading}
           apiUrl={apiUrl}
         />
         <div className="kanban-error">
@@ -138,6 +324,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
         <KanbanHeader
           selectedPipelineId={selectedPipelineId}
           onPipelineChange={setSelectedPipelineId}
+          selectedOwnerId={selectedOwnerId}
+          onOwnerChange={setSelectedOwnerId}
+          owners={owners}
+          ownersLoading={ownersLoading}
+          pipelines={pipelines}
+          pipelinesLoading={pipelinesLoading}
           apiUrl={apiUrl}
         />
         <div className="kanban-empty">
@@ -153,6 +345,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
         <KanbanHeader
           selectedPipelineId={selectedPipelineId}
           onPipelineChange={setSelectedPipelineId}
+          selectedOwnerId={selectedOwnerId}
+          onOwnerChange={setSelectedOwnerId}
+          owners={owners}
+          ownersLoading={ownersLoading}
+          pipelines={pipelines}
+          pipelinesLoading={pipelinesLoading}
           apiUrl={apiUrl}
         />
         <div className="kanban-empty">
@@ -169,9 +367,41 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <KanbanHeader
         selectedPipelineId={selectedPipelineId}
-        onPipelineChange={setSelectedPipelineId}
+        onPipelineChange={(pipelineId) => {
+          // Normalize pipeline ID to string
+          const normalizedId = String(pipelineId)
+          console.log('[KanbanBoard] Pipeline change requested:', {
+            original: pipelineId,
+            normalized: normalizedId,
+            availablePipelines: pipelines.map(p => ({ id: String(p.id), name: p.name })),
+          })
+          setPipelineId(normalizedId)
+        }}
+        selectedOwnerId={selectedOwnerId}
+        onOwnerChange={setSelectedOwnerId}
+        owners={owners}
+        ownersLoading={ownersLoading}
+        pipelines={pipelines}
+        pipelinesLoading={pipelinesLoading}
         onStagesManage={() => setShowStageManagement(true)}
-        onPipelineCreated={handleStagesUpdated}
+        onPipelineCreated={() => {
+          // After pipeline is created, re-fetch list
+          ;(async () => {
+            try {
+              const response = await fetch(`${apiUrl}/pipelines?where[isActive][equals]=true&limit=100`)
+              if (response.ok) {
+                const result = await response.json()
+                const docs: Pipeline[] = (result.docs || []).map((p: { id: string | number; name: string; isActive: boolean }) => ({
+                  ...p,
+                  id: String(p.id), // Normalize all IDs to strings
+                }))
+                setPipelines(docs)
+              }
+            } catch (err) {
+              console.error('[KanbanBoard] Failed to refresh pipelines', err)
+            }
+          })()
+        }}
         onNewOpportunity={() => setShowNewOpportunity(true)}
         apiUrl={apiUrl}
       />
@@ -208,46 +438,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ apiUrl = '/api' }) => 
 
       {/* Opportunity Modal - Create New */}
       {showNewOpportunity && data && selectedPipelineId && (
-        (() => {
-          // Verify data matches selected pipeline
-          const dataPipelineId = String(data.pipeline.id)
-          const selectedPipelineIdStr = String(selectedPipelineId)
-          
-          if (dataPipelineId !== selectedPipelineIdStr) {
-            console.error('[KanbanBoard] Pipeline mismatch when creating opportunity:', {
-              dataPipelineId,
-              selectedPipelineId: selectedPipelineIdStr,
-              dataPipelineName: data.pipeline.name,
-            })
-            // Refetch data to ensure we have the correct pipeline
+        <NewOpportunityModal
+          isOpen={showNewOpportunity}
+          onClose={() => setShowNewOpportunity(false)}
+          pipelineId={selectedPipelineId}
+          owners={owners}
+          pipelines={pipelines}
+          apiUrl={apiUrl}
+          onCreated={() => {
             refetch()
-            return null
-          }
-          
-          console.log('[KanbanBoard] Opening new opportunity modal:', {
-            pipelineId: selectedPipelineId,
-            pipelineName: data.pipeline.name,
-            columnsCount: data.columns.length,
-            firstStageId: data.columns[0]?.stage?.id,
-            firstStageName: data.columns[0]?.stage?.name,
-          })
-          
-          return (
-            <OpportunityModal
-              opportunity={null}
-              columns={data.columns}
-              currentStageId={data.columns[0]?.stage?.id || ''}
-              pipelineId={selectedPipelineId}
-              onClose={() => setShowNewOpportunity(false)}
-              onStageChange={async () => {}}
-              onSave={() => {
-                refetch()
-                setShowNewOpportunity(false)
-              }}
-              apiUrl={apiUrl}
-            />
-          )
-        })()
+            setShowNewOpportunity(false)
+          }}
+          onPipelineChange={(pipeline) => {
+            setPipelineId(pipeline)
+          }}
+        />
       )}
 
       {/* Stage Management Modal */}

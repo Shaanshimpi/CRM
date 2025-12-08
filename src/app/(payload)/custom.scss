@@ -71,6 +71,55 @@
   --firefist-accent: 16 100% 65%;
 }
 
+// Accessible button styling for Payload admin buttons
+:root {
+  --firefist-btn-bg: var(--firefist-primary);
+  --firefist-btn-bg-hover: var(--firefist-accent);
+  --firefist-btn-text: 0 0% 100%;
+  --firefist-btn-text-contrast: 0 0% 10%;
+}
+
+[data-theme='dark'] {
+  --firefist-btn-text: 0 0% 98%;
+  --firefist-btn-text-contrast: 0 0% 8%;
+}
+
+.payload-admin-ui {
+  // Primary & secondary buttons
+  button,
+  .btn,
+  .btn--style-primary,
+  .btn--style-secondary,
+  .payload__button {
+    background-color: hsl(var(--firefist-btn-bg));
+    color: hsl(var(--firefist-btn-text));
+    border: 1px solid hsl(var(--firefist-btn-bg));
+    font-weight: 600;
+    transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover:not(:disabled) {
+      background-color: hsl(var(--firefist-btn-bg-hover));
+      color: hsl(var(--firefist-btn-text-contrast));
+      box-shadow: 0 8px 20px hsl(var(--firefist-btn-bg) / 0.35);
+    }
+
+    &:focus-visible {
+      outline: 2px solid hsl(var(--firefist-btn-bg-hover));
+      outline-offset: 2px;
+    }
+
+    &:disabled,
+    &[aria-disabled='true'] {
+      background-color: hsl(var(--theme-border-color));
+      border-color: hsl(var(--theme-border-color));
+      color: hsl(var(--theme-text) / 0.5);
+      cursor: not-allowed;
+      box-shadow: none;
+      opacity: 0.8;
+    }
+  }
+}
+
 // Enhanced header/nav styling
 .payload-nav {
   .payload-logo {

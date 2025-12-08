@@ -105,12 +105,23 @@ export const kanbanEndpoint: Endpoint = {
       
       // STEP 2: Try to parse pipeline parameter
       let pipelineId: string | undefined
+      let assignedToFilter: string | number | undefined
       
       // Method 1: From query object
       if (query && typeof query === 'object' && 'pipeline' in query) {
         const pipelineParam = (query as Record<string, unknown>).pipeline
         console.log('[Kanban Endpoint] Found pipeline in query.pipeline:', pipelineParam)
         pipelineId = String(pipelineParam || '').trim() || undefined
+      }
+      if (query && typeof query === 'object' && 'assignedTo' in query) {
+        const ownerParam = (query as Record<string, unknown>).assignedTo
+        if (ownerParam) {
+          const ownerValue = String(ownerParam).trim()
+          if (ownerValue) {
+            assignedToFilter = /^\d+$/.test(ownerValue) ? Number(ownerValue) : ownerValue
+            console.log('[Kanban Endpoint] Found assignedTo in query:', assignedToFilter)
+          }
+        }
       }
       
       // Method 2: From URL string
@@ -124,6 +135,13 @@ export const kanbanEndpoint: Endpoint = {
             const url = new URL(urlString, origin)
             pipelineId = url.searchParams.get('pipeline') || undefined
             console.log('[Kanban Endpoint] Parsed pipeline from URL:', pipelineId)
+            if (!assignedToFilter) {
+              const ownerParam = url.searchParams.get('assignedTo')
+              if (ownerParam) {
+                assignedToFilter = /^\d+$/.test(ownerParam) ? Number(ownerParam) : ownerParam
+                console.log('[Kanban Endpoint] Parsed assignedTo from URL:', assignedToFilter)
+              }
+            }
           } catch (urlErr) {
             console.error('[Kanban Endpoint] URL parse error:', urlErr)
           }
@@ -157,32 +175,9 @@ export const kanbanEndpoint: Endpoint = {
         console.log(`[Kanban Endpoint]   Pipeline ${idx + 1}: ID=${p.id}, Name=${p.name}`)
       })
       
-      // STEP 4: Handle numeric pipeline ID (convert to UUID)
-      if (/^\d+$/.test(pipelineId)) {
-        console.log('[Kanban Endpoint] === STEP 4: Converting numeric pipeline ID ===')
-        const pipelineIndex = parseInt(pipelineId, 10) - 1
-        console.log('[Kanban Endpoint] Pipeline index:', pipelineIndex, '(from input:', pipelineId + ')')
-        
-        if (pipelineIndex >= 0 && pipelineIndex < allPipelines.docs.length) {
-          const oldPipelineId = pipelineId
-          pipelineId = String(allPipelines.docs[pipelineIndex].id)
-          console.log('[Kanban Endpoint] Converted', oldPipelineId, 'to UUID:', pipelineId)
-        } else {
-          console.log('[Kanban Endpoint] ERROR: Index out of range')
-          return Response.json({ 
-            error: 'Invalid pipeline index',
-            message: `Pipeline index "${pipelineId}" is out of range (1-${allPipelines.docs.length})`,
-            availablePipelines: allPipelines.docs.map((p, idx) => ({ 
-              index: idx + 1,
-              id: p.id, 
-              name: p.name 
-            }))
-          }, { status: 400 })
-        }
-      }
-      
-      // STEP 5: Fetch the specific pipeline
-      console.log('[Kanban Endpoint] === STEP 5: Fetching pipeline with ID:', pipelineId, '===')
+      // STEP 4: Fetch the specific pipeline by ID (not by index!)
+      // The pipelineId should be used directly as the database ID, not as an array index
+      console.log('[Kanban Endpoint] === STEP 4: Fetching pipeline with ID:', pipelineId, '===')
       // TypeScript guard: pipelineId is guaranteed to be defined at this point
       if (!pipelineId) {
         return Response.json({ error: 'Pipeline ID is required' }, { status: 400 })
@@ -198,8 +193,8 @@ export const kanbanEndpoint: Endpoint = {
         isActive: pipeline.isActive
       }, null, 2))
       
-      // STEP 6: Fetch stages
-      console.log('[Kanban Endpoint] === STEP 6: Fetching stages ===')
+      // STEP 5: Fetch stages
+      console.log('[Kanban Endpoint] === STEP 5: Fetching stages ===')
       const stagesResult = await payload.find({
         collection: 'stages',
         where: {
@@ -215,15 +210,23 @@ export const kanbanEndpoint: Endpoint = {
         console.log(`[Kanban Endpoint]   Stage ${idx + 1}: ID=${s.id}, Name=${s.name}, Order=${s.order}`)
       })
       
-      // STEP 7: Fetch opportunities
-      console.log('[Kanban Endpoint] === STEP 7: Fetching opportunities ===')
+      // STEP 6: Fetch opportunities
+      console.log('[Kanban Endpoint] === STEP 6: Fetching opportunities ===')
+      const opportunityWhere: Record<string, { equals: string | number }> = {
+        pipeline: {
+          equals: pipelineId,
+        },
+      }
+
+      if (assignedToFilter !== undefined) {
+        opportunityWhere.assignedTo = {
+          equals: assignedToFilter,
+        }
+      }
+
       const opportunitiesResult = await payload.find({
         collection: 'opportunities',
-        where: {
-          pipeline: {
-            equals: pipelineId,
-          },
-        },
+        where: opportunityWhere,
         depth: 2,
         req,
       })
@@ -237,8 +240,8 @@ export const kanbanEndpoint: Endpoint = {
         console.log(`[Kanban Endpoint]   Opp ${idx + 1}: ID=${opp.id}, Name=${opp.name}, Stage=${stageId}`)
       })
       
-      // STEP 8: Group opportunities by stage and format response
-      console.log('[Kanban Endpoint] === STEP 8: Grouping opportunities by stage ===')
+      // STEP 7: Group opportunities by stage and format response
+      console.log('[Kanban Endpoint] === STEP 7: Grouping opportunities by stage ===')
       const columns: KanbanColumn[] = stagesResult.docs.map((stage) => {
         const stageOpportunities = opportunitiesResult.docs
           .filter((opp) => {
@@ -280,12 +283,42 @@ export const kanbanEndpoint: Endpoint = {
               completedCount: tasksArray.filter((t) => t.status === 'completed').length,
             } : undefined
 
-            // Process reminders
+            // Process reminders (legacy array + new relationship)
             const remindersArray = Array.isArray(opp.reminders) ? opp.reminders : []
-            const reminders = remindersArray.length > 0 ? {
-              count: remindersArray.length,
-              pendingCount: remindersArray.filter((r) => r.status === 'pending').length,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const remindersRelationshipRaw = (opp as any)?.remindersRelationship
+            const remindersRelationshipArray = Array.isArray(remindersRelationshipRaw)
+              ? remindersRelationshipRaw
+              : []
+            const normalizedRelationshipReminders = remindersRelationshipArray
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map((reminder: any) => {
+                if (reminder && typeof reminder === 'object') {
+                  return {
+                    id: String(reminder.id ?? reminder._id ?? ''),
+                    status: reminder.status ?? 'pending',
+                  }
+                }
+                return null
+              })
+              .filter((reminder) => reminder && reminder.id) as Array<{ id: string; status?: string }>
+
+            const legacyPending = remindersArray.filter((r) => r?.status === 'pending').length
+            const linkedPending = normalizedRelationshipReminders.filter((r) => (r.status ?? 'pending') === 'pending').length
+            const totalRemindersCount = remindersArray.length + normalizedRelationshipReminders.length
+            const reminders = totalRemindersCount > 0 ? {
+              count: totalRemindersCount,
+              pendingCount: legacyPending + linkedPending,
             } : undefined
+
+            if (totalRemindersCount > 0) {
+              console.log('[Kanban Endpoint] Reminder summary for opportunity:', {
+                opportunityId: String(opp.id),
+                legacyCount: remindersArray.length,
+                linkedCount: normalizedRelationshipReminders.length,
+                pendingCount: reminders?.pendingCount ?? 0,
+              })
+            }
 
             return {
               id: String(opp.id),
@@ -336,7 +369,7 @@ export const kanbanEndpoint: Endpoint = {
       const totalOpportunities = opportunitiesResult.docs.length
       const totalValue = opportunitiesResult.docs.reduce((sum, opp) => sum + (opp.value || 0), 0)
 
-      console.log('[Kanban Endpoint] === STEP 9: Returning formatted response ===')
+      console.log('[Kanban Endpoint] === STEP 8: Returning formatted response ===')
       const result: KanbanData = {
         pipeline: {
           id: String(pipeline.id),
@@ -387,7 +420,7 @@ export const updateStageEndpoint: Endpoint = {
     console.log('[UpdateStage Endpoint] User authenticated:', user.email)
 
     try {
-      let body: { opportunityId?: string | number; newStageId?: string | number }
+      let body: { opportunityId?: string | number; newStageId?: string | number; stageId?: string | number }
       if (typeof req.json === 'function') {
         body = await req.json()
       } else if ((req as unknown as { request?: { json?: () => Promise<{ opportunityId?: string | number; newStageId?: string | number }> } }).request?.json) {
@@ -403,7 +436,13 @@ export const updateStageEndpoint: Endpoint = {
       }
       console.log('[UpdateStage Endpoint] Request body:', body)
       
-      const { opportunityId, newStageId: stageId } = body
+      const { opportunityId, newStageId, stageId: legacyStageId } = body
+      const stageId = newStageId ?? legacyStageId
+      if (legacyStageId && !newStageId) {
+        console.warn('[UpdateStage Endpoint] Received legacy stageId field. Please update client to send newStageId.', {
+          legacyStageId,
+        })
+      }
       console.log('[UpdateStage Endpoint] Opportunity ID:', opportunityId)
       console.log('[UpdateStage Endpoint] Stage ID:', stageId)
 

@@ -75,12 +75,6 @@
   overflow: hidden;
   transition: all 0.2s ease;
   box-shadow: 0 1px 2px 0 hsl(var(--theme-text) / 0.05);
-
-  &.is-over {
-    border-color: hsl(var(--theme-success-500));
-    background: hsl(var(--theme-success-500) / 0.05);
-    box-shadow: 0 0 0 2px hsl(var(--theme-success-500) / 0.2);
-  }
 }
 
 .kanban-column-header {
@@ -170,6 +164,7 @@
   border: 1px solid hsl(var(--theme-border-color));
   border-radius: var(--radius);
   padding: 0.75rem;
+  font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 1px 2px 0 hsl(var(--theme-text) / 0.05);
@@ -197,7 +192,7 @@
 }
 
 .kanban-card-title {
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 500;
   color: hsl(var(--theme-text));
   margin: 0;
@@ -225,7 +220,7 @@
 }
 
 .kanban-card-company {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: hsl(var(--theme-text) / 0.6);
   margin-bottom: 0.5rem;
   line-height: 1.4;
@@ -239,14 +234,14 @@
 }
 
 .kanban-card-contact-name {
-  font-size: 0.75rem;
+  font-size: 0.9rem;
   color: hsl(var(--theme-text) / 0.8);
   line-height: 1.4;
   font-weight: 500;
 }
 
 .kanban-card-contact-phone {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: hsl(var(--theme-text) / 0.6);
   line-height: 1.4;
 }
@@ -260,20 +255,20 @@
 }
 
 .kanban-card-value {
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 600;
   color: hsl(var(--theme-text));
   line-height: 1.4;
 }
 
 .kanban-card-probability {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: hsl(var(--theme-text) / 0.6);
   line-height: 1.4;
 }
 
 .kanban-card-date {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   color: hsl(var(--theme-text) / 0.6);
   margin-top: 0.5rem;
   line-height: 1.4;
@@ -370,7 +365,7 @@
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   color: hsl(var(--theme-text) / 0.6);
   line-height: 1;
 

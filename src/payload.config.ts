@@ -12,6 +12,7 @@ import { Pipelines } from './collections/Pipelines'
 import { Stages } from './collections/Stages'
 import { Leads } from './collections/Leads'
 import { Opportunities } from './collections/Opportunities'
+import { Reminders } from './collections/Reminders'
 import {
   csvImportEndpoint,
   excelImportEndpoint,
@@ -51,7 +52,7 @@ export default buildConfig({
       ],
     },
   },
-  collections: [Users, Media, Pipelines, Stages, Leads, Opportunities],
+  collections: [Users, Media, Pipelines, Stages, Leads, Opportunities, Reminders],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {

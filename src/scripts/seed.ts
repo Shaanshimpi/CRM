@@ -28,7 +28,6 @@ const pipelineData = [
       { name: 'Proposal', order: 2, color: '#8b5cf6', description: 'Proposal sent to client' },
       { name: 'Negotiation', order: 3, color: '#f59e0b', description: 'In negotiation phase' },
       { name: 'Closed Won', order: 4, color: '#10b981', isClosedStage: true, closedType: 'won', description: 'Deal won' },
-      { name: 'Closed Lost', order: 5, color: '#ef4444', isClosedStage: true, closedType: 'lost', description: 'Deal lost' },
     ],
   },
   {
@@ -55,6 +54,18 @@ const pipelineData = [
       { name: 'Proposal', order: 2, color: '#8b5cf6', description: 'Proposal sent' },
       { name: 'Approval', order: 3, color: '#f59e0b', description: 'Awaiting approval' },
       { name: 'Closed', order: 4, color: '#10b981', isClosedStage: true, closedType: 'won', description: 'Upsell completed' },
+    ],
+  },
+  {
+    name: 'Enterprise Pipeline',
+    description: 'Large enterprise deals and strategic partnerships',
+    color: '#f59e0b',
+    isActive: true,
+    stages: [
+      { name: 'Initial Contact', order: 0, color: '#94a3b8', isDefault: true, description: 'First contact with enterprise client' },
+      { name: 'Discovery', order: 1, color: '#3b82f6', description: 'Understanding enterprise needs' },
+      { name: 'Proposal', order: 2, color: '#8b5cf6', description: 'Custom proposal delivered' },
+      { name: 'Closed Won', order: 3, color: '#10b981', isClosedStage: true, closedType: 'won', description: 'Enterprise deal won' },
     ],
   },
 ]
@@ -142,19 +153,60 @@ async function seed() {
   }
 
   try {
-    // Get or create a default user for assignments
-    let defaultUser
-    const users = await payload.find({
+    // Get or create test user for testing
+    let testUser
+    const testUserEmail = 'test@firefist.com'
+    const testUserPassword = 'test123456'
+    
+    const existingTestUser = await payload.find({
       collection: 'users',
+      where: {
+        email: {
+          equals: testUserEmail,
+        },
+      },
       limit: 1,
     })
 
-    if (users.docs.length > 0) {
-      defaultUser = users.docs[0]
-      console.log(`✅ Using existing user: ${defaultUser.email}`)
+    if (existingTestUser.docs.length > 0) {
+      testUser = existingTestUser.docs[0]
+      console.log(`✅ Test user already exists: ${testUserEmail}`)
+    } else {
+      try {
+        testUser = await payload.create({
+          collection: 'users',
+          data: {
+            email: testUserEmail,
+            password: testUserPassword,
+            firstName: 'Test',
+            lastName: 'User',
+            role: 'admin',
+            isActive: true,
+          },
+        })
+        console.log(`✅ Created test user: ${testUserEmail} / ${testUserPassword}`)
+      } catch (error) {
+        console.log(`⚠️  Could not create test user: ${error}`)
+      }
+    }
+
+    // Get users for assignments (distribute opportunities across multiple users)
+    const usersResult = await payload.find({
+      collection: 'users',
+      limit: 10, // Get up to 10 users for variety
+    })
+
+    const availableUsers = usersResult.docs
+    let defaultUser = availableUsers.length > 0 ? availableUsers[0] : null
+
+    if (availableUsers.length > 0) {
+      console.log(`✅ Found ${availableUsers.length} user(s) for assignments`)
+      if (availableUsers.length > 1) {
+        console.log(`   Opportunities will be distributed across ${availableUsers.length} users`)
+      }
     } else {
       console.log('⚠️  No users found. Please create a user first in the admin panel.')
-      console.log('   The seed script will continue but leads will not be assigned.\n')
+      console.log('   The seed script will continue but opportunities will not be assigned.\n')
     }
 
     // Create Pipelines and Stages
@@ -308,7 +360,7 @@ async function seed() {
             jobTitle,
             source,
             status,
-            assignedTo: defaultUser?.id || undefined,
+            assignedTo: availableUsers.length > 0 ? getRandomItem(availableUsers).id : undefined,
             address: {
               street: `${Math.floor(Math.random() * 999) + 1} Main Street`,
               city,
@@ -328,7 +380,7 @@ async function seed() {
 
     // Create Opportunities
     console.log('💼 Creating opportunities...\n')
-    const opportunitiesToCreate = 30 // Total opportunities across all pipelines
+    const opportunitiesToCreate = 35 // Total opportunities across all pipelines (30-40 range)
     let createdOpportunities = 0
     let skippedOpportunities = 0
 
@@ -362,17 +414,21 @@ async function seed() {
       }
     }
 
-    for (const pipeline of createdPipelines) {
+    for (let pipelineIndex = 0; pipelineIndex < createdPipelines.length; pipelineIndex++) {
+      const pipeline = createdPipelines[pipelineIndex]
       const pipelineStages = stagesByPipeline.get(pipeline.id) || []
       if (pipelineStages.length === 0) {
         console.log(`   ⚠️  No stages found for pipeline "${pipeline.name}", skipping opportunities...`)
         continue
       }
 
-      // Create opportunities for this pipeline (distribute across pipelines)
-      const opportunitiesPerPipeline = Math.ceil(opportunitiesToCreate / createdPipelines.length)
+      // Create opportunities for this pipeline (distribute evenly across pipelines)
+      // Distribute opportunities more evenly, with some randomness
+      const baseOpportunitiesPerPipeline = Math.floor(opportunitiesToCreate / createdPipelines.length)
+      const extraOpportunities = opportunitiesToCreate % createdPipelines.length
+      const opportunitiesForThisPipeline = baseOpportunitiesPerPipeline + (pipelineIndex < extraOpportunities ? 1 : 0)
       
-      for (let i = 0; i < opportunitiesPerPipeline; i++) {
+      for (let i = 0; i < opportunitiesForThisPipeline; i++) {
         const firstName = getRandomItem(firstNames)
         const lastName = getRandomItem(lastNames)
         const company = getRandomItem(companies)
@@ -416,6 +472,61 @@ async function seed() {
         }
 
         try {
+          // Add some variety: tasks, notes, and reminders for some opportunities
+          const hasTasks = Math.random() > 0.4 // 60% chance
+          const hasNotes = Math.random() > 0.3 // 70% chance
+          const hasReminders = Math.random() > 0.5 // 50% chance
+
+          const tasks = hasTasks ? [
+            {
+              title: getRandomItem(['Follow up call', 'Send proposal', 'Schedule demo', 'Prepare contract', 'Review requirements', 'Technical assessment']),
+              description: getRandomItem(['High priority task', 'Need to complete soon', 'Waiting for client response', 'In progress']),
+              status: getRandomItem(['pending', 'inProgress', 'completed']) as 'pending' | 'inProgress' | 'completed',
+              priority: getRandomItem(['low', 'medium', 'high']) as 'low' | 'medium' | 'high',
+              dueDate: new Date(Date.now() + Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(), // Within 7 days
+            },
+            ...(Math.random() > 0.7 ? [{
+              title: getRandomItem(['Client meeting', 'Product demo', 'Contract review', 'Technical discussion']),
+              description: 'Additional task',
+              status: 'pending' as const,
+              priority: 'medium' as const,
+            }] : []),
+          ] : []
+
+          const notes = hasNotes ? [
+            {
+              content: getRandomItem([
+                `Initial discussion with ${firstName} ${lastName} went well. They showed interest in our solution.`,
+                `Client is evaluating multiple vendors. We need to highlight our unique value proposition.`,
+                `Follow-up meeting scheduled for next week. Need to prepare detailed proposal.`,
+                `Technical requirements discussed. Our solution aligns well with their needs.`,
+                `Budget approved. Moving forward with contract negotiations.`,
+                `Client requested additional information about implementation timeline.`,
+              ]),
+              isPrivate: Math.random() > 0.8, // 20% chance of private notes
+              createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(), // Within last 30 days
+            },
+            ...(Math.random() > 0.6 ? [{
+              content: getRandomItem([
+                'Additional context: Client has specific compliance requirements.',
+                'Note: Decision maker is the CTO, need to address technical concerns.',
+                'Important: Client mentioned budget constraints, need to provide flexible pricing.',
+              ]),
+              isPrivate: false,
+              createdAt: new Date(Date.now() - Math.random() * 15 * 24 * 60 * 60 * 1000).toISOString(),
+            }] : []),
+          ] : []
+
+          const reminders = hasReminders ? [
+            {
+              title: getRandomItem(['Follow up call', 'Send proposal', 'Schedule meeting', 'Contract review', 'Check in with client']),
+              description: `Reminder for ${opportunityName}`,
+              reminderDate: new Date(Date.now() + Math.random() * 14 * 24 * 60 * 60 * 1000).toISOString(), // Within 14 days
+              type: getRandomItem(['in-app', 'email', 'call']) as 'in-app' | 'email' | 'call',
+              status: 'pending' as const,
+            },
+          ] : []
+
           await payload.create({
             collection: 'opportunities',
             data: {
@@ -427,17 +538,25 @@ async function seed() {
               currency,
               probability,
               expectedCloseDate: expectedCloseDate.toISOString(),
-              assignedTo: defaultUser?.id || undefined,
+              assignedTo: availableUsers.length > 0 ? getRandomItem(availableUsers).id : undefined,
               company,
               contactName: `${firstName} ${lastName}`,
               contactEmail: generateEmail(firstName, lastName, company),
               contactPhone: generatePhone(),
               tags: getRandomItems(['enterprise', 'high-value', 'hot', 'qualified', 'mid-market'], Math.floor(Math.random() * 3) + 1),
+              tasks: tasks.length > 0 ? tasks : undefined,
+              notes: notes.length > 0 ? notes : undefined,
+              reminders: reminders.length > 0 ? reminders : undefined,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } as any,
           })
           createdOpportunities++
-          console.log(`   ✅ Created opportunity: ${opportunityName} (${company}) in ${pipeline.name} - ${stage.name}`)
+          const details = [
+            hasTasks && `${tasks.length} task(s)`,
+            hasNotes && `${notes.length} note(s)`,
+            hasReminders && `${reminders.length} reminder(s)`,
+          ].filter(Boolean).join(', ')
+          console.log(`   ✅ Created opportunity: ${opportunityName} (${company}) in ${pipeline.name} - ${stage.name}${details ? ` [${details}]` : ''}`)
         } catch (error) {
           console.error(`   ❌ Failed to create opportunity ${opportunityName}:`, error)
         }

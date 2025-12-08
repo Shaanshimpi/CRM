@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import type { KanbanOpportunity, KanbanColumn } from '../../endpoints/opportunities/kanban'
 
 interface OpportunityModalProps {
@@ -38,6 +38,20 @@ interface Reminder {
   reminderDate: string
   type: 'in-app' | 'email' | 'sms' | 'call'
   status: 'pending' | 'sent' | 'dismissed'
+}
+
+interface LinkedReminderRecord {
+  id: string
+  title: string
+  reminderDate?: string
+  status?: string
+  type?: string
+  assignedTo?: {
+    id?: string | number
+    email?: string
+    firstName?: string
+    lastName?: string
+  }
 }
 
 interface User {
@@ -85,6 +99,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
     tasks?: Task[]
     notes?: Note[]
     reminders?: Reminder[]
+    remindersRelationship?: Array<LinkedReminderRecord | string | number | null> | null
   } | null>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -109,6 +124,40 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   const [tasks, setTasks] = useState<Task[]>([])
   const [notes, setNotes] = useState<Note[]>([])
   const [reminders, setReminders] = useState<Reminder[]>([])
+  const [linkedReminders, setLinkedReminders] = useState<LinkedReminderRecord[]>([])
+  
+  // Request deduplication refs
+  const fetchingOpportunityRef = useRef<string | number | null>(null)
+  const fetchingRemindersRef = useRef<string | number | null>(null)
+  const fetchingUsersRef = useRef<boolean>(false)
+  // Simple caches to avoid redundant API calls during the session
+  const opportunityCacheRef = useRef<Map<string, any>>(new Map())
+  const remindersCacheRef = useRef<Map<string, LinkedReminderRecord[]>>(new Map())
+  const usersCacheRef = useRef<User[] | null>(null)
+  
+  const mergeLinkedReminders = useCallback(
+    (incoming: LinkedReminderRecord[], options: { replace?: boolean } = {}) => {
+      setLinkedReminders((prev) => {
+        const map = new Map<string, LinkedReminderRecord>()
+        if (!options.replace) {
+          prev.forEach((record) => {
+            if (record?.id) {
+              map.set(record.id, record)
+            }
+          })
+        }
+
+        incoming.forEach((record) => {
+          if (record?.id) {
+            map.set(record.id, record)
+          }
+        })
+
+        return Array.from(map.values())
+      })
+    },
+    []
+  )
 
   // UI state for adding new items
   // These state variables are used for future UI expansion
@@ -119,36 +168,161 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_showAddReminder, setShowAddReminder] = useState(false)
 
+  const formatReminderDate = useCallback((date?: string) => {
+    if (!date) return 'No due date set'
+    const parsed = new Date(date)
+    if (Number.isNaN(parsed.getTime())) {
+      return date
+    }
+    return parsed.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }, [])
+
   const fetchFullOpportunity = useCallback(async () => {
+    if (!opportunity?.id) return
+    
+    // Serve from cache if available
+    const cached = opportunityCacheRef.current.get(String(opportunity.id))
+    if (cached) {
+      console.log('[OpportunityModal] Serving opportunity from cache:', opportunity.id)
+      setFullOpportunity(cached)
+      return
+    }
+    
+    // Prevent duplicate requests
+    const oppId = String(opportunity.id)
+    if (fetchingOpportunityRef.current === oppId) {
+      console.log('[OpportunityModal] Skipping duplicate opportunity fetch:', oppId)
+      return
+    }
+    
+    fetchingOpportunityRef.current = oppId
     setLoading(true)
     try {
-      const response = await fetch(`${apiUrl}/opportunities/${opportunity?.id}?depth=2`)
+      console.log('[OpportunityModal] Fetching opportunity:', oppId)
+      const response = await fetch(`${apiUrl}/opportunities/${oppId}?depth=2`)
       if (!response.ok) throw new Error('Failed to fetch opportunity')
       const data = await response.json()
       setFullOpportunity(data)
+      opportunityCacheRef.current.set(oppId, data)
     } catch (error) {
       console.error('Failed to fetch opportunity:', error)
       alert('Failed to load opportunity details')
     } finally {
       setLoading(false)
+      fetchingOpportunityRef.current = null
     }
   }, [apiUrl, opportunity?.id])
 
   const fetchUsers = useCallback(async () => {
+    // Serve from cache if present
+    if (usersCacheRef.current) {
+      console.log('[OpportunityModal] Serving users from cache')
+      setUsers(usersCacheRef.current)
+      return
+    }
+
+    // Prevent duplicate requests
+    if (fetchingUsersRef.current) {
+      console.log('[OpportunityModal] Skipping duplicate users fetch')
+      return
+    }
+    
+    fetchingUsersRef.current = true
     try {
+      console.log('[OpportunityModal] Fetching users')
       const response = await fetch(`${apiUrl}/users?where[isActive][equals]=true&limit=100`)
       if (!response.ok) return
       const data = await response.json()
-      setUsers(data.docs || [])
+      const docs = data.docs || []
+      setUsers(docs)
+      usersCacheRef.current = docs
     } catch (error) {
       console.error('Failed to fetch users:', error)
+    } finally {
+      fetchingUsersRef.current = false
     }
   }, [apiUrl])
 
+  const fetchLinkedRemindersFromApi = useCallback(async () => {
+    if (!opportunity?.id) return
+    
+    // Serve from cache if available
+    const cached = remindersCacheRef.current.get(String(opportunity.id))
+    if (cached) {
+      console.log('[OpportunityModal] Serving reminders from cache:', opportunity.id)
+      mergeLinkedReminders(cached, { replace: true })
+      return
+    }
+    
+    // Prevent duplicate requests
+    const oppId = String(opportunity.id)
+    if (fetchingRemindersRef.current === oppId) {
+      console.log('[OpportunityModal] Skipping duplicate reminders fetch:', oppId)
+      return
+    }
+    
+    fetchingRemindersRef.current = oppId
+    try {
+      console.log('[OpportunityModal] Fetching linked reminders:', oppId)
+      const encodedId = encodeURIComponent(oppId)
+      const response = await fetch(
+        `${apiUrl}/reminders?where[opportunity][equals]=${encodedId}&depth=1&limit=50`
+      )
+      if (!response.ok) {
+        throw new Error('Failed to fetch linked reminders')
+      }
+      const data = await response.json()
+      const docs = Array.isArray(data?.docs) ? data.docs : []
+      const normalized = docs
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((reminder: any) => {
+          if (reminder && typeof reminder === 'object') {
+            const reminderId = reminder.id || reminder._id
+            if (!reminderId) return null
+            return {
+              id: String(reminderId),
+              title: reminder.title || 'Untitled Reminder',
+              reminderDate: reminder.reminderDate,
+              status: reminder.status || 'pending',
+              type: reminder.type || 'in-app',
+              assignedTo: typeof reminder.assignedTo === 'object' ? reminder.assignedTo : undefined,
+            }
+          }
+          return null
+        })
+        .filter((reminder): reminder is LinkedReminderRecord => Boolean(reminder?.id))
+      console.log('[OpportunityModal] Linked reminders fetched from API:', {
+        opportunityId: opportunity.id,
+        count: normalized.length,
+        reminderIds: normalized.map((reminder) => reminder.id),
+      })
+      mergeLinkedReminders(normalized, { replace: true })
+      remindersCacheRef.current.set(oppId, normalized)
+    } catch (error) {
+      console.error('[OpportunityModal] Failed to fetch linked reminders from API:', error)
+    } finally {
+      fetchingRemindersRef.current = null
+    }
+  }, [apiUrl, mergeLinkedReminders, opportunity?.id])
+
+  // Track last fetched opportunity ID to prevent redundant fetches
+  const lastFetchedOpportunityIdRef = useRef<string | number | null>(null)
+  
   useEffect(() => {
-    if (opportunity?.id) {
+    const oppId = opportunity?.id ? String(opportunity.id) : null
+    
+    if (oppId && lastFetchedOpportunityIdRef.current !== oppId) {
+      // Only fetch if this is a different opportunity
+      lastFetchedOpportunityIdRef.current = oppId
       fetchFullOpportunity()
-    } else if (isCreateMode) {
+      fetchLinkedRemindersFromApi()
+    } else if (isCreateMode && !oppId) {
       // Reset form fields when creating new opportunity
       setName('')
       setCompany('')
@@ -160,6 +334,7 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
       setProbability('')
       setExpectedCloseDate('')
       setAssignedTo('')
+      setLinkedReminders([])
       
       // Ensure we use a stage from the columns that belong to the selected pipeline
       // The columns are already filtered by pipeline from the kanban endpoint
@@ -185,9 +360,22 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
       setReminders([])
       setLeadId(null)
     }
-    // Always fetch users for assignee selection
-    fetchUsers()
-  }, [opportunity?.id, isCreateMode, currentStageId, columns, pipelineId, fetchFullOpportunity, fetchUsers])
+    
+    // Fetch users only once when modal opens (if not already fetched)
+    if (users.length === 0) {
+      fetchUsers()
+    }
+  }, [
+    opportunity?.id,
+    isCreateMode,
+    currentStageId,
+    columns,
+    pipelineId,
+    fetchFullOpportunity,
+    fetchLinkedRemindersFromApi,
+    fetchUsers,
+    users.length,
+  ])
 
   useEffect(() => {
     if (fullOpportunity && !isCreateMode) {
@@ -205,8 +393,36 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
       setTasks(Array.isArray(fullOpportunity.tasks) ? fullOpportunity.tasks : [])
       setNotes(Array.isArray(fullOpportunity.notes) ? fullOpportunity.notes : [])
       setReminders(Array.isArray(fullOpportunity.reminders) ? fullOpportunity.reminders : [])
+      const normalizedLinkedReminders = Array.isArray(fullOpportunity.remindersRelationship)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ? fullOpportunity.remindersRelationship
+            .map((reminder: any) => {
+              if (reminder && typeof reminder === 'object') {
+                const reminderId = reminder.id || reminder._id
+                if (!reminderId) return null
+                return {
+                  id: String(reminderId),
+                  title: reminder.title || 'Untitled Reminder',
+                  reminderDate: reminder.reminderDate,
+                  status: reminder.status || 'pending',
+                  type: reminder.type || 'in-app',
+                  assignedTo: typeof reminder.assignedTo === 'object' ? reminder.assignedTo : undefined,
+                }
+              }
+              return null
+            })
+            .filter((reminder): reminder is LinkedReminderRecord => Boolean(reminder?.id))
+        : []
+      mergeLinkedReminders(normalizedLinkedReminders, { replace: true })
+      console.log('[OpportunityModal] Linked reminders loaded:', {
+        opportunityId: fullOpportunity.id,
+        count: normalizedLinkedReminders.length,
+        reminderIds: normalizedLinkedReminders.map((reminder) => reminder.id),
+      })
+    } else {
+      setLinkedReminders([])
     }
-  }, [fullOpportunity, currentStageId, isCreateMode])
+  }, [fullOpportunity, currentStageId, isCreateMode, mergeLinkedReminders])
 
   const handleCreateLead = async () => {
     if (!contactEmail || !contactName) {
@@ -446,6 +662,9 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
         }
 
         const created = await response.json()
+        
+        // Reset saving state and close modal immediately
+        setSaving(false)
         alert('Opportunity created successfully!')
         onSave?.()
         onClose()
@@ -467,7 +686,17 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
           throw new Error(errorMessage)
         }
 
-        await onStageChange(opportunity!.id, selectedStageId)
+        // Only update stage if it changed, and don't block modal closing
+        const stageChanged = String(selectedStageId) !== String(currentStageId)
+        if (stageChanged) {
+          // Call onStageChange but don't await it - let it run in background
+          onStageChange(opportunity!.id, selectedStageId).catch((err) => {
+            console.error('[OpportunityModal] Stage change failed (non-blocking):', err)
+          })
+        }
+        
+        // Reset saving state and close modal immediately
+        setSaving(false)
         onSave?.()
         onClose()
       }
@@ -927,12 +1156,13 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
                   onChange={(e) => setSelectedStageId(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    backgroundColor: 'hsl(var(--theme-elevation-0))',
-                    border: '1px solid hsl(var(--theme-border-color))',
+                    padding: '0.6rem 0.85rem',
+                    backgroundColor: 'hsl(var(--firefist-primary, var(--theme-primary-500)) / 0.1)',
+                    border: '2px solid hsl(var(--firefist-primary, var(--theme-primary-500)))',
                     borderRadius: 'var(--radius)',
                     color: 'hsl(var(--theme-text))',
-                    fontSize: '0.875rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
                   }}
                 >
                   {columns
@@ -1208,6 +1438,99 @@ export const OpportunityModal: React.FC<OpportunityModalProps> = ({
             {notes.length === 0 && (
               <p style={{ fontSize: '0.875rem', color: 'hsl(var(--theme-text) / 0.5)', fontStyle: 'italic' }}>
                 No notes yet. Click &quot;Add Note&quot; to create one.
+              </p>
+            )}
+          </div>
+
+          {/* Linked Reminders (New Collection) */}
+          <div style={{ marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3
+                style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  color: 'hsl(var(--theme-text) / 0.7)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  margin: 0,
+                }}
+              >
+                Linked Reminders (New) ({linkedReminders.length})
+              </h3>
+              <a
+                href="/admin/collections/reminders"
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'hsl(var(--firefist-primary))',
+                  textDecoration: 'none',
+                }}
+                onClick={() => {
+                  console.log('[OpportunityModal] Opening Reminders collection from modal')
+                }}
+              >
+                Open Reminders Admin →
+              </a>
+            </div>
+            {linkedReminders.length > 0 ? (
+              linkedReminders.map((linkedReminder) => (
+                <div
+                  key={linkedReminder.id}
+                  style={{
+                    padding: '1rem',
+                    border: '1px solid hsl(var(--theme-border-color))',
+                    borderRadius: 'var(--radius)',
+                    marginBottom: '0.75rem',
+                    backgroundColor: 'hsl(var(--theme-elevation-1))',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+                    <div>
+                      <div
+                        style={{
+                          fontSize: '0.975rem',
+                          fontWeight: 600,
+                          color: 'hsl(var(--theme-text))',
+                        }}
+                      >
+                        {linkedReminder.title}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'hsl(var(--theme-text) / 0.7)', marginTop: '0.25rem' }}>
+                        Status: <strong>{linkedReminder.status ?? 'pending'}</strong> • Type:{' '}
+                        {linkedReminder.type ?? 'in-app'}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'hsl(var(--theme-text) / 0.7)' }}>
+                        Due: {formatReminderDate(linkedReminder.reminderDate)}
+                      </div>
+                      {linkedReminder.assignedTo?.email && (
+                        <div style={{ fontSize: '0.8rem', color: 'hsl(var(--theme-text) / 0.7)' }}>
+                          Assigned to: {linkedReminder.assignedTo.email}
+                        </div>
+                      )}
+                    </div>
+                    <a
+                      href={`/admin/collections/reminders/${linkedReminder.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'hsl(var(--firefist-primary))',
+                        textDecoration: 'none',
+                        fontWeight: 600,
+                      }}
+                      onClick={() => {
+                        console.log('[OpportunityModal] Opening linked reminder record:', linkedReminder.id)
+                      }}
+                    >
+                      View ↗
+                    </a>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p style={{ fontSize: '0.875rem', color: 'hsl(var(--theme-text) / 0.5)', fontStyle: 'italic' }}>
+                No reminders from the new Reminders collection are linked to this opportunity yet.
               </p>
             )}
           </div>

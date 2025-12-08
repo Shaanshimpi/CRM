@@ -116,7 +116,9 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
   return (
     <>
       <div
-        ref={cardRef}
+        ref={(node) => {
+          cardRef.current = node
+        }}
         className="kanban-card"
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}

@@ -73,6 +73,7 @@ export interface Config {
     stages: Stage;
     leads: Lead;
     opportunities: Opportunity;
+    reminders: Reminder;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -86,6 +87,7 @@ export interface Config {
     stages: StagesSelect<false> | StagesSelect<true>;
     leads: LeadsSelect<false> | LeadsSelect<true>;
     opportunities: OpportunitiesSelect<false> | OpportunitiesSelect<true>;
+    reminders: RemindersSelect<false> | RemindersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -544,6 +546,73 @@ export interface Opportunity {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Linked reminders (new system)
+   */
+  remindersRelationship?: (number | Reminder)[] | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Manage reminders for opportunities and leads. Set reminders for follow-ups, meetings, and important dates.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reminders".
+ */
+export interface Reminder {
+  id: number;
+  /**
+   * Reminder title or subject
+   */
+  title: string;
+  /**
+   * Additional details about the reminder
+   */
+  description?: string | null;
+  /**
+   * Date and time for the reminder
+   */
+  reminderDate: string;
+  /**
+   * How the reminder should be delivered
+   */
+  type?: ('in-app' | 'email' | 'sms' | 'call') | null;
+  /**
+   * Current status of the reminder
+   */
+  status?: ('pending' | 'sent' | 'dismissed') | null;
+  /**
+   * Related opportunity (if applicable)
+   */
+  opportunity?: (number | null) | Opportunity;
+  /**
+   * Related lead (if applicable)
+   */
+  lead?: (number | null) | Lead;
+  /**
+   * User who should be reminded
+   */
+  assignedTo: number | User;
+  /**
+   * Priority level of the reminder
+   */
+  priority?: ('low' | 'medium' | 'high' | 'urgent') | null;
+  /**
+   * If snoozed, when to show this reminder again
+   */
+  snoozedUntil?: string | null;
+  /**
+   * When this reminder was sent
+   */
+  sentAt?: string | null;
+  /**
+   * When this reminder was dismissed
+   */
+  dismissedAt?: string | null;
+  /**
+   * User who created this reminder
+   */
+  createdBy?: (number | null) | User;
   updatedAt: string;
   createdAt: string;
 }
@@ -594,6 +663,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'opportunities';
         value: number | Opportunity;
+      } | null)
+    | ({
+        relationTo: 'reminders';
+        value: number | Reminder;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -807,6 +880,28 @@ export interface OpportunitiesSelect<T extends boolean = true> {
         createdBy?: T;
         id?: T;
       };
+  remindersRelationship?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reminders_select".
+ */
+export interface RemindersSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
+  reminderDate?: T;
+  type?: T;
+  status?: T;
+  opportunity?: T;
+  lead?: T;
+  assignedTo?: T;
+  priority?: T;
+  snoozedUntil?: T;
+  sentAt?: T;
+  dismissedAt?: T;
+  createdBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
